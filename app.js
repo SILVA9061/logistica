@@ -85,7 +85,6 @@ function abrirLightbox(urlOriginal) {
     let linkDownload = urlOriginal;
     let id = '';
     
-    // Se for do Google Drive, nós forçamos o link direto de download de alta qualidade
     if (urlOriginal.includes('/d/')) id = urlOriginal.split('/d/')[1].split('/')[0];
     else if (urlOriginal.includes('id=')) id = urlOriginal.split('id=')[1].split('&')[0];
     
@@ -102,7 +101,6 @@ function abrirLightbox(urlOriginal) {
 }
 
 function fecharLightbox(forcar = false, evento = null) {
-    // Só fecha se forçado pelo botão ou se o usuário clicar exatamente no fundo preto
     if (forcar || (evento && evento.target.id === 'lightbox-overlay')) {
         document.getElementById('lightbox-overlay').style.display = 'none';
         document.getElementById('lightbox-img').src = '';
@@ -421,6 +419,109 @@ async function excluirLoja(id, btn) {
         try { const { error } = await supabaseClient.from('lojas').delete().eq('id', id); if(error) throw error; mostrarAviso('Loja removida.', 'sucesso'); carregarTabelaLojas(); } 
         catch(e) { mostrarAviso('Erro: A loja possui histórico de pedidos.', 'erro'); btn.innerHTML = htmlOriginal; btn.style.pointerEvents = 'auto'; lucide.createIcons(); }
     });
+}
+
+function abrirModalNovaLoja() {
+    document.getElementById('loja-nome').value = '';
+    document.getElementById('loja-promotor').value = '';
+    document.getElementById('loja-contato').value = '';
+    document.getElementById('loja-cep').value = '';
+    document.getElementById('loja-rua').value = '';
+    document.getElementById('loja-bairro').value = '';
+    document.getElementById('loja-cidade').value = '';
+    document.getElementById('loja-estado').value = '';
+    
+    if (usuarioLogado.cargo === 'Supervisor') { 
+        document.getElementById('container-supervisor-loja').style.display = 'none'; 
+    } else { 
+        document.getElementById('container-supervisor-loja').style.display = 'block'; 
+    }
+    document.getElementById('modal-nova-loja').style.display = 'flex';
+}
+
+async function salvarLoja() {
+    let supervisor_id = document.getElementById('loja-supervisor').value;
+    if (usuarioLogado.cargo === 'Supervisor') supervisor_id = usuarioLogado.id;
+    
+    const dados = { 
+        nome: document.getElementById('loja-nome').value.trim(), 
+        supervisor_id: supervisor_id, 
+        promotor_nome: document.getElementById('loja-promotor').value.trim(),
+        promotor_contato: document.getElementById('loja-contato').value.trim(),
+        cep: document.getElementById('loja-cep').value.trim(),
+        rua: document.getElementById('loja-rua').value.trim(),
+        bairro: document.getElementById('loja-bairro').value.trim(),
+        cidade: document.getElementById('loja-cidade').value.trim(),
+        estado: document.getElementById('loja-estado').value.trim()
+    };
+    
+    if (!dados.nome || !dados.supervisor_id) return mostrarAviso('Loja e Supervisor obrigatórios!', 'erro');
+    
+    setCarregamento('btn-salvar-loja', true, 'Salvando...');
+    try { 
+        const { error } = await supabaseClient.from('lojas').insert([dados]); 
+        if (error) throw error; 
+        mostrarAviso('Loja criada!', 'sucesso'); 
+        document.getElementById('modal-nova-loja').style.display = 'none'; 
+        carregarTabelaLojas(); 
+    } catch (e) { 
+        mostrarAviso('Erro ao criar loja.', 'erro'); 
+    } finally { 
+        setCarregamento('btn-salvar-loja', false); 
+    }
+}
+
+function abrirModalEditarLoja(lojaStr) {
+    const loja = JSON.parse(lojaStr);
+    document.getElementById('edit-id-loja').value = loja.id; 
+    document.getElementById('edit-loja-nome').value = loja.nome; 
+    document.getElementById('edit-loja-promotor').value = loja.promotor_nome || '';
+    document.getElementById('edit-loja-contato').value = loja.promotor_contato || '';
+    document.getElementById('edit-loja-cep').value = loja.cep || '';
+    document.getElementById('edit-loja-rua').value = loja.rua || '';
+    document.getElementById('edit-loja-bairro').value = loja.bairro || '';
+    document.getElementById('edit-loja-cidade').value = loja.cidade || '';
+    document.getElementById('edit-loja-estado').value = loja.estado || '';
+    
+    if (usuarioLogado.cargo === 'Diretor' || usuarioLogado.cargo === 'Logistica' || usuarioLogado.cargo === 'Master') { 
+        document.getElementById('container-edit-supervisor-loja').style.display = 'block'; 
+        document.getElementById('edit-loja-supervisor').value = loja.supervisor_id;
+    } else {
+        document.getElementById('container-edit-supervisor-loja').style.display = 'none';
+    }
+    
+    document.getElementById('modal-editar-loja').style.display = 'flex';
+}
+
+async function salvarEdicaoLoja() {
+    const id = document.getElementById('edit-id-loja').value; 
+    let supervisor_id = document.getElementById('edit-loja-supervisor').value;
+    if (usuarioLogado.cargo === 'Supervisor') supervisor_id = usuarioLogado.id;
+    
+    const dados = { 
+        nome: document.getElementById('edit-loja-nome').value.trim(), 
+        supervisor_id: supervisor_id, 
+        promotor_nome: document.getElementById('edit-loja-promotor').value.trim(),
+        promotor_contato: document.getElementById('edit-loja-contato').value.trim(),
+        cep: document.getElementById('edit-loja-cep').value.trim(),
+        rua: document.getElementById('edit-loja-rua').value.trim(),
+        bairro: document.getElementById('edit-loja-bairro').value.trim(),
+        cidade: document.getElementById('edit-loja-cidade').value.trim(),
+        estado: document.getElementById('edit-loja-estado').value.trim()
+    };
+    
+    setCarregamento('btn-salvar-edicao-loja', true, 'Salvando...');
+    try { 
+        const { error } = await supabaseClient.from('lojas').update(dados).eq('id', id); 
+        if (error) throw error; 
+        mostrarAviso('Atualizado com sucesso!', 'sucesso'); 
+        document.getElementById('modal-editar-loja').style.display = 'none'; 
+        carregarTabelaLojas(); 
+    } catch(e) { 
+        mostrarAviso('Erro ao editar loja.', 'erro'); 
+    } finally { 
+        setCarregamento('btn-salvar-edicao-loja', false); 
+    }
 }
 
 async function carregarTabelaUsuarios() {
@@ -763,9 +864,6 @@ function abrirModalVerPedido(id) {
     
     let galeriaHtml = '';
     
-    // ==========================================
-    // AGORA COM LIGHTBOX INTEGRADO NAS IMAGENS
-    // ==========================================
     if (p.foto_url) {
         galeriaHtml += `<p style="margin: 15px 0 5px 0; color: var(--primary); font-size: 12px; font-weight: bold;">FOTOS DA BANCADA</p><div class="galeria-fotos">`;
         p.foto_url.split(',').forEach(url => { galeriaHtml += `<img src="${consertarLinkGoogleDrive(url.trim())}" loading="lazy" onclick="abrirLightbox('${url.trim()}')">`; });
