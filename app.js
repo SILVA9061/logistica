@@ -294,7 +294,8 @@ function agruparCatalogo(dados_brutos) {
         let baseName = item.nome ? item.nome.trim() : 'Material Sem Nome';
         let varName = 'Único';
 
-        const match = baseName.match(/^(.*) \(([^)]+)\)$/);
+        // Correção: Regex guloso (.*) que aceita parênteses DENTRO do nome da variação
+        const match = baseName.match(/^(.*) \((.*)\)$/);
         if (match) { baseName = match[1].trim(); varName = match[2].trim(); }
 
         const categoriaSegura = item.categoria ? item.categoria.trim() : 'Geral';
@@ -706,8 +707,9 @@ function alterarQtdPedido(id, delta) {
     if(input) input.value = item.qtdSelecionada;
     
     let baseName = item.nome || 'Sem Nome';
-    if (baseName.includes('(') && baseName.includes(')')) {
-        const match = baseName.match(/^(.*) \(([^)]+)\)$/);
+    // Correção: Mesma regra nova de parênteses para o carrinho não se perder
+    if (baseName.includes('(') && baseName.endsWith(')')) {
+        const match = baseName.match(/^(.*) \((.*)\)$/);
         if (match) baseName = match[1].trim();
     }
     
@@ -717,7 +719,7 @@ function alterarQtdPedido(id, delta) {
     if(cardBase) { 
         const temAlgum = memoriaCatalogoPedido.some(i => {
             let bn = i.nome || '';
-            if (bn.includes('(')) bn = bn.match(/^(.*) \(/)?.[1]?.trim() || bn;
+            if (bn.includes('(') && bn.endsWith(')')) bn = bn.match(/^(.*) \((.*)\)$/)?.[1]?.trim() || bn;
             return bn === baseName && (i.categoria || 'Geral') === (item.categoria || 'Geral') && i.qtdSelecionada > 0;
         });
         if(temAlgum) cardBase.classList.add('selecionado'); else cardBase.classList.remove('selecionado'); 
@@ -795,11 +797,14 @@ async function salvarSolicitacao() {
     
     itensSelecionados.forEach(item => {
         const qtdPedida = item.qtdSelecionada; const estoqueAtual = item.quantidade;
+        
+        // Correção: Extrai o nome da variação de forma limpa para o Romaneio
         let nomeFinalFormato = item.nome;
-        if (item.secao && item.secao !== 'Único') {
-            const regex = new RegExp(` \\(${item.secao}\\)$`);
-            nomeFinalFormato = `${item.nome.replace(regex, '')} - Var: ${item.secao}`;
+        const matchVar = item.nome.match(/^(.*) \((.*)\)$/);
+        if (matchVar && matchVar[2] !== 'Único') {
+            nomeFinalFormato = `${matchVar[1].trim()} - Var: ${matchVar[2].trim()}`;
         }
+
         itensPedido.push(`${qtdPedida}x ${nomeFinalFormato}`);
         if (estoqueAtual <= 0 || qtdPedida > estoqueAtual) temFalta = true;
         const novoEstoque = estoqueAtual - qtdPedida; 
@@ -813,9 +818,15 @@ async function salvarSolicitacao() {
 
     try {
         let urlsBancada = [];
-        for (let i = 0; i < arquivosBancada.length; i++) {
-            const urlDrive = await fazerUploadDrive(arquivosBancada[i], `bancada_${i+1}`);
-            urlsBancada.push(urlDrive);
+        
+        try {
+            for (let i = 0; i < arquivosBancada.length; i++) {
+                const urlDrive = await fazerUploadDrive(arquivosBancada[i], `bancada_${i+1}`);
+                urlsBancada.push(urlDrive);
+            }
+        } catch (errDrive) {
+            console.error("Erro no envio para o Google Drive:", errDrive);
+            mostrarAviso('Falha no upload das fotos. Enviando pedido sem imagens.', 'erro');
         }
         
         const { error: erroInsert } = await supabaseClient.from('pedidos').insert([{ loja_id: lojaId, detalhes, foto_url: urlsBancada.join(','), status: 'Pendente' }]);
