@@ -5,6 +5,7 @@ const supabaseUrl = 'https://qrmywcvsvkrqtapgkmnj.supabase.co';
 const supabaseKey = 'sb_publishable_HvS_fAvGc9ToE-CXLkDDzw_EstUEqoN';
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
+// URL Corrigida e Restaurada
 const URL_GOOGLE_SCRIPT = 'https://script.google.com/macros/s/AKfycbyTYb1WBCcYWBGtpDG8Xyktc6UuFvltMYKd1W5E0OeVzg1iJFvmKoxw6Fr2QCbUmJwNbw/exec';
 
 let usuarioLogado = null;
@@ -268,7 +269,6 @@ function renderizarMenuDinamico() {
 }
 
 function mostrarTela(idTela) {
-    // Esconde o menu mobile se ele estiver aberto
     const sidebar = document.getElementById('sidebar');
     if (sidebar && sidebar.classList.contains('aberto')) toggleMenuMobile();
 
@@ -461,7 +461,7 @@ async function salvarProduto() {
                 if(varName) { 
                     const { error } = await supabaseClient.from('catalogo').insert([{ 
                         nome: `${nomeBase} (${varName})`, categoria: categoria, subcategoria: subCatBase ? `${subCatBase} | ${varName}` : `${varName}`, 
-                        quantidade: qtd, foto_url: fotoUrl, ativo: true, secao: '' 
+                        quantidade: qtd, foto_url: fotoUrl, ativo: true, secao: ''
                     }]); 
                     if(error) throw error;
                 }
@@ -474,7 +474,7 @@ async function salvarProduto() {
         mostrarAviso('Material adicionado!', 'sucesso'); document.getElementById('modal-novo-produto').style.display = 'none'; carregarVitrineAdmin();
     } catch (e) { 
         console.error("ERRO NO BANCO:", e);
-        mostrarAviso('Erro ao salvar. Verifique o console.', 'erro'); 
+        mostrarAviso('Erro ao salvar. Verifique a conexão.', 'erro'); 
     } finally { setCarregamento('btn-salvar-produto', false); }
 }
 
@@ -1083,8 +1083,8 @@ async function confirmarDespacho() {
         mostrarAviso('Conferência e Despacho realizados!', 'sucesso');
         document.getElementById('modal-despacho').style.display = 'none';
         
-        carregarPedidos(true); // Reseta a lista
-        carregarCatalogoPedido(); // Atualiza a vitrine de fundo caso tenha havido estorno
+        carregarPedidos(true); 
+        carregarCatalogoPedido(); 
         carregarVitrineAdmin(); 
 
     } catch (e) {
