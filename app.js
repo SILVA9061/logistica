@@ -797,14 +797,11 @@ async function salvarSolicitacao() {
     
     itensSelecionados.forEach(item => {
         const qtdPedida = item.qtdSelecionada; const estoqueAtual = item.quantidade;
-        
-        // Correção: Extrai o nome da variação de forma limpa para o Romaneio
         let nomeFinalFormato = item.nome;
         const matchVar = item.nome.match(/^(.*) \((.*)\)$/);
         if (matchVar && matchVar[2] !== 'Único') {
             nomeFinalFormato = `${matchVar[1].trim()} - Var: ${matchVar[2].trim()}`;
         }
-
         itensPedido.push(`${qtdPedida}x ${nomeFinalFormato}`);
         if (estoqueAtual <= 0 || qtdPedida > estoqueAtual) temFalta = true;
         const novoEstoque = estoqueAtual - qtdPedida; 
@@ -834,7 +831,18 @@ async function salvarSolicitacao() {
         
         for (let item of atualizacoesEstoque) { 
             await supabaseClient.from('catalogo').update({ quantidade: item.quantidade }).eq('id', item.id);
-            await supabaseClient.from('logs_estoque').insert([{ material: item.nome, quantidade_movimentada: -item.baixado, responsavel: usuarioLogado.nome, motivo: 'Solicitação de Pedido' }]).catch(e => {}); 
+            
+            // Correção: Bloco de log isolado com try/catch separado para evitar quebra no Supabase v2
+            try {
+                await supabaseClient.from('logs_estoque').insert([{ 
+                    material: item.nome, 
+                    quantidade_movimentada: -item.baixado, 
+                    responsavel: usuarioLogado.nome, 
+                    motivo: 'Solicitação de Pedido' 
+                }]);
+            } catch (errLog) {
+                console.warn("Log de estoque opcional não gravado:", errLog);
+            }
         }
 
         mostrarAviso('Pedido Enviado com Sucesso!', 'sucesso'); 
