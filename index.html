@@ -10,11 +10,9 @@
     <link rel="stylesheet" href="style.css">
     <link rel="apple-touch-icon" href="icone-oppo-512.png">
     
-    <!-- Bibliotecas Externas -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.1/dist/browser-image-compression.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Biblioteca para Exportar Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="dark-mode">
@@ -26,8 +24,21 @@
         <div class="glass-card" id="form-login">
             <h2>Logística <span class="neon-text">OPPO</span></h2>
             <p class="subtitle">Acesso restrito à operação</p>
+            
+            <div id="login-erro-card" class="login-error-card">
+                <i data-lucide="alert-triangle" class="lucide-sm"></i>
+                <span>Usuário ou senha incorretos!</span>
+            </div>
+
             <input type="email" id="login-email" class="input-neon" placeholder="E-mail">
-            <input type="password" id="login-senha" class="input-neon" placeholder="Senha">
+            
+            <div class="input-password-wrapper">
+                <input type="password" id="login-senha" class="input-neon" placeholder="Senha">
+                <button type="button" class="btn-toggle-senha" onclick="toggleSenha('login-senha', 'icone-senha-login')">
+                    <i id="icone-senha-login" data-lucide="eye" class="lucide-sm"></i>
+                </button>
+            </div>
+            
             <button id="btn-login" onclick="fazerLogin()" class="btn-neon">Acessar Painel</button>
             <div style="margin-top: 20px; text-align: center; font-size: 13px; color: var(--cor-secundaria);">
                 É supervisor e não tem acesso? <br>
@@ -41,7 +52,14 @@
             <p class="subtitle">Cadastro rápido para Supervisores</p>
             <input type="text" id="cad-nome" class="input-neon" placeholder="Nome Completo">
             <input type="email" id="cad-email" class="input-neon" placeholder="E-mail corporativo">
-            <input type="password" id="cad-senha" class="input-neon" placeholder="Crie uma senha">
+            
+            <div class="input-password-wrapper">
+                <input type="password" id="cad-senha" class="input-neon" placeholder="Crie uma senha">
+                <button type="button" class="btn-toggle-senha" onclick="toggleSenha('cad-senha', 'icone-senha-cad')">
+                    <i id="icone-senha-cad" data-lucide="eye" class="lucide-sm"></i>
+                </button>
+            </div>
+
             <button id="btn-cadastrar" onclick="fazerCadastro()" class="btn-neon">Finalizar Cadastro</button>
             <div style="margin-top: 20px; text-align: center; font-size: 13px; color: var(--cor-secundaria);">
                 Já tem uma conta? <br>
@@ -53,7 +71,6 @@
     <!-- ================= ESTRUTURA DO APP ================= -->
     <div id="tela-app" style="display: none; width: 100%; height: 100vh;">
         
-        <!-- CABEÇALHO MOBILE (Só aparece no celular) -->
         <div class="mobile-header">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <div class="logo-icon" style="margin:0;">O</div>
@@ -63,8 +80,6 @@
                 <i data-lucide="menu" style="width: 32px; height: 32px;"></i>
             </button>
         </div>
-        
-        <!-- MÁSCARA ESCURA DO MENU MOBILE -->
         <div id="menu-overlay" onclick="toggleMenuMobile()"></div>
 
         <!-- BARRA LATERAL DINÂMICA -->
@@ -73,11 +88,7 @@
                 <div class="logo-icon">O</div>
                 <div>Logística OPPO<br><span id="label-nome-usuario" style="font-size: 11px; color: var(--cor-secundaria);">Carregando...</span></div>
             </div>
-            
-            <nav class="sidebar-nav" id="sidebar-menu-dinamico">
-                <!-- Preenchido dinamicamente via JS -->
-            </nav>
-            
+            <nav class="sidebar-nav" id="sidebar-menu-dinamico"></nav>
             <div style="margin-top: auto;">
                 <a href="#" class="sidebar-link btn-sair" onclick="fazerLogout()"><i data-lucide="log-out"></i> Sair</a>
                 <div class="rodape-sidebar" style="margin-top: 15px;"><p style="margin: 0; font-size: 10px;">Powered by</p><strong>Gabriel Silva</strong></div>
@@ -95,26 +106,28 @@
                         </div>
                         <div class="custom-options" id="custom-options-sup"></div>
                     </div>
-                    
-                    <!-- Botão de Exportar para Excel (Apenas Logística/Diretor) -->
                     <button class="btn-sistema" id="btn-exportar-excel" onclick="exportarExcel()" style="display: none; background: #10b981; color: #fff;">
                         <i data-lucide="download"></i> Exportar Excel
                     </button>
                 </div>
             </div>
 
+            <!-- DASHBOARD CARDS COM O NOVO CARD REVERSA -->
             <div class="dashboard-grid">
                 <div class="dash-card pendente" id="card-Pendente" onclick="filtrarPorCard('Pendente')">
                     <h4>Pendentes</h4><h2 id="dash-pendentes">0</h2>
                 </div>
                 <div class="dash-card enviado" id="card-Enviado" onclick="filtrarPorCard('Enviado')">
-                    <h4>Em Trânsito</h4><h2 id="dash-enviados">0</h2>
+                    <h4>Enviados</h4><h2 id="dash-enviados">0</h2>
+                </div>
+                <div class="dash-card reversa" id="card-Reversa" onclick="filtrarPorCard('Reversa')">
+                    <h4>Reversas</h4><h2 id="dash-reversas">0</h2>
                 </div>
                 <div class="dash-card entregue" id="card-Entregue" onclick="filtrarPorCard('Entregue')">
                     <h4>Entregues</h4><h2 id="dash-entregues">0</h2>
                 </div>
                 <div class="dash-card alerta" id="card-Alerta" onclick="filtrarPorCard('Alerta')">
-                    <h4>Alertas / Faltas</h4><h2 id="dash-alertas">0</h2>
+                    <h4>Faltas</h4><h2 id="dash-alertas">0</h2>
                 </div>
             </div>
             
@@ -140,7 +153,7 @@
             </div>
         </div>
 
-        <!-- ABA 2: FAZER PEDIDO (NOVA SEÇÃO CARRINHO) -->
+        <!-- ABA 2: FAZER PEDIDO (CARRINHO) -->
         <div id="tela-fazer-pedido" class="container container-wide" style="display: none;">
             <div class="header-global">
                 <h2>Carrinho de Solicitação</h2>
@@ -149,7 +162,6 @@
                 </div>
             </div>
 
-            <!-- Seleção da Loja -->
             <div class="card-padrao" style="margin-bottom: 25px;">
                 <label style="font-size: 14px; color: var(--primary);">1. Selecione o Destino (Loja / Unidade) *</label>
                 <select id="select-loja" class="input-neon" style="width: 100%; margin-top: 10px; margin-bottom: 0; font-size: 16px;">
@@ -157,16 +169,10 @@
                 </select>
             </div>
 
-            <!-- Vitrine de Produtos Interativa -->
             <h3 style="color: #fff; margin-bottom: 15px;">2. Escolha os Materiais</h3>
-            <div class="categoria-nav" id="nav-categorias-pedido">
-                <!-- Injetado via JS -->
-            </div>
-            <div class="vitrine-grid" id="vitrine-pedido" style="margin-bottom: 30px;">
-                <!-- Cards de produtos injetados via JS -->
-            </div>
+            <div class="categoria-nav" id="nav-categorias-pedido"></div>
+            <div class="vitrine-grid" id="vitrine-pedido" style="margin-bottom: 30px;"></div>
 
-            <!-- Upload com Prévia e Finalização -->
             <div class="card-padrao" style="border-color: var(--primary); margin-bottom: 40px;">
                 <h3 style="color: #fff; margin-bottom: 15px;">3. Finalizar e Comprovar</h3>
                 <label>Foto de Validação da Bancada *</label>
@@ -176,9 +182,7 @@
                 </label>
                 <input type="file" id="input-foto" accept="image/*" multiple style="display: none;" onchange="lidarComSelecaoDeFotos(this)">
                 
-                <!-- CONTAINER ONDE AS MINIATURAS APARECEM -->
                 <div id="preview-fotos-bancada" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;"></div>
-                
                 <button id="btn-enviar-pedido" class="btn-neon" style="margin-top: 20px; font-size: 16px;" onclick="salvarSolicitacao()">Enviar Pedido para Expedição</button>
             </div>
         </div>
@@ -203,7 +207,7 @@
                 <h2 id="titulo-tela-usuarios">Gerenciar Equipe e Lojas</h2>
                 <div class="header-actions" style="display: flex; gap: 10px;">
                     <button class="btn-sistema" onclick="abrirModalNovaLoja()"><i data-lucide="store"></i> Nova Loja</button>
-                    <button class="btn-sistema" id="btn-novo-usuario" onclick="document.getElementById('modal-novo-usuario').style.display = 'flex'">
+                    <button class="btn-sistema" id="btn-novo-usuario" onclick="abrirModalNovoUsuario()">
                         <i data-lucide="user-plus"></i> Novo Usuário
                     </button>
                 </div>
@@ -227,9 +231,8 @@
         </div>
     </div>
 
-    <!-- ================= MODAIS DE AÇÃO GLOBAIS ================= -->
+    <!-- ================= MODAIS GLOBAIS DE AÇÃO ================= -->
     
-    <!-- MODAL GLOBAL DE CONFIRMAÇÃO -->
     <div id="modal-confirmacao" class="modal-overlay" style="display: none; z-index: 100000;">
         <div class="modal-content" style="max-width: 400px; text-align: center;">
             <i data-lucide="alert-triangle" style="width: 48px; height: 48px; color: #ff4d4d; margin-bottom: 15px; margin-top: 10px;"></i>
@@ -242,7 +245,7 @@
         </div>
     </div>
     
-    <!-- Modal: VER PEDIDO E IMPRIMIR ROMANEIO -->
+    <!-- Modal: VER PEDIDO -->
     <div id="modal-ver-pedido" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 500px; background: #13171c;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 15px;">
@@ -253,30 +256,25 @@
             
             <div class="botoes-acao" style="margin-top: 20px;">
                 <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-ver-pedido').style.display='none'">Fechar Lista</button>
-                <button class="btn-acao btn-enviar" onclick="window.print()" style="background: #3b82f6; color: #fff;"><i data-lucide="printer"></i> Salvar PDF / Imprimir</button>
+                <button class="btn-acao btn-enviar" onclick="window.print()" style="background: #3b82f6; color: #fff;"><i data-lucide="printer"></i> Salvar PDF</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Novo Material (Redesenhado) -->
+    <!-- Modais de Catálogo e Estoque (Novo/Editar Produto) -->
     <div id="modal-novo-produto" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 650px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h3 style="margin: 0;"><i data-lucide="package-plus" style="color: var(--primary); margin-right: 8px;"></i> Adicionar ao Portfólio</h3>
                 <button onclick="document.getElementById('modal-novo-produto').style.display = 'none'" style="background: transparent; border: none; color: var(--cor-secundaria); cursor: pointer;"><i data-lucide="x"></i></button>
             </div>
-            
-            <!-- Bloco 1: Informações Básicas -->
             <div class="card-padrao" style="background: rgba(0,0,0,0.2); padding: 20px; margin-bottom: 15px; border-color: rgba(255,255,255,0.05);">
                 <label>Nome do Material / Base *</label>
                 <input type="text" id="input-nome-produto" class="input-neon" placeholder="Ex: Display Acrílico / Camisa Polo OPPO">
-                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
                     <div>
                         <label>Categoria Principal *</label>
-                        <select id="input-categoria" class="input-neon" style="width: 100%; margin-bottom: 5px;">
-                            <option value="Geral">Geral</option>
-                        </select>
+                        <select id="input-categoria" class="input-neon" style="width: 100%; margin-bottom: 5px;"><option value="Geral">Geral</option></select>
                         <input type="text" id="input-nova-categoria" class="input-neon" placeholder="Nome da Nova Categoria" style="display: none; width: 100%; margin-bottom: 5px; border-color: var(--primary);">
                         <button type="button" id="btn-toggle-categoria" onclick="toggleNovaCategoria('input')" style="background: transparent; color: var(--primary); border: none; padding: 0; cursor: pointer; font-size: 12px; font-weight: bold;">+ Criar Nova Categoria</button>
                     </div>
@@ -286,8 +284,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Bloco 2: Variações e Estoque -->
             <div class="card-padrao" style="background: rgba(0,229,176,0.05); border-color: rgba(0,229,176,0.2); padding: 20px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <div>
@@ -296,22 +292,17 @@
                     </div>
                     <button type="button" onclick="adicionarLinhaGrade()" class="btn-sistema" style="font-size: 11px; padding: 6px 12px;">+ Variação</button>
                 </div>
-                
                 <div id="container-grade-tamanhos" style="display: flex; flex-direction: column; gap: 8px;"></div>
-                
-                <!-- Este campo some automaticamente se houver variações -->
                 <div id="container-estoque-global" style="margin-top: 15px; border-top: 1px dashed rgba(0,229,176,0.2); padding-top: 15px;">
                     <label>Qtd. Estoque Global <span style="font-weight: normal; color: var(--cor-secundaria);">(Para itens únicos)</span></label>
                     <input type="number" id="input-qtd-produto" class="input-neon" value="0" style="max-width: 150px; margin-bottom: 0;">
                 </div>
             </div>
-
             <label style="margin-top: 15px; display: block;">Foto do Produto (Opcional)</label>
             <label for="input-foto-produto" class="file-upload-custom" style="padding: 20px;">
                 <i data-lucide="image"></i><span id="nome-arquivo-produto">Clique para anexar foto</span>
             </label>
             <input type="file" id="input-foto-produto" accept="image/*" style="display: none;" onchange="atualizarNomeArquivo(this, 'nome-arquivo-produto')">
-            
             <div class="botoes-acao" style="margin-top: 25px;">
                 <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-novo-produto').style.display = 'none'">Cancelar</button>
                 <button id="btn-salvar-produto" class="btn-acao btn-enviar" onclick="salvarProduto()">Salvar Material</button>
@@ -319,20 +310,15 @@
         </div>
     </div>
 
-    <!-- Modal: Editar Material (Redesenhado) -->
     <div id="modal-editar-produto" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 650px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h3 style="margin: 0;"><i data-lucide="edit-3" style="color: var(--primary); margin-right: 8px;"></i> Editar Lote</h3>
                 <button onclick="document.getElementById('modal-editar-produto').style.display = 'none'" style="background: transparent; border: none; color: var(--cor-secundaria); cursor: pointer;"><i data-lucide="x"></i></button>
             </div>
-            
             <input type="hidden" id="edit-ids-grupo">
-            
             <div class="card-padrao" style="background: rgba(0,0,0,0.2); padding: 20px; margin-bottom: 15px; border-color: rgba(255,255,255,0.05);">
-                <label>Nome do Material / Base *</label>
-                <input type="text" id="edit-nome-produto" class="input-neon">
-                
+                <label>Nome do Material / Base *</label><input type="text" id="edit-nome-produto" class="input-neon">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
                     <div>
                         <label>Categoria Principal</label>
@@ -340,30 +326,19 @@
                         <input type="text" id="edit-nova-categoria" class="input-neon" placeholder="Nova Categoria" style="display: none; width: 100%; margin-bottom: 5px; border-color: var(--primary);">
                         <button type="button" id="btn-toggle-edit-categoria" onclick="toggleNovaCategoria('edit')" style="background: transparent; color: var(--primary); border: none; padding: 0; cursor: pointer; font-size: 12px; font-weight: bold;">+ Criar Nova Categoria</button>
                     </div>
-                    <div>
-                        <label>Subcategoria / Linha</label>
-                        <input type="text" id="edit-subcategoria" class="input-neon" style="margin-bottom: 0;">
-                    </div>
+                    <div><label>Subcategoria / Linha</label><input type="text" id="edit-subcategoria" class="input-neon" style="margin-bottom: 0;"></div>
                 </div>
             </div>
-
-            <!-- Grade de Variações Dinâmica no EDITAR -->
             <div class="card-padrao" style="background: rgba(0,229,176,0.05); border-color: rgba(0,229,176,0.2); padding: 20px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <div>
-                        <label style="margin: 0; color: var(--primary); font-size: 14px;"><i data-lucide="layers" class="lucide-sm" style="margin-right:5px;"></i> Variações / Grade</label>
-                    </div>
+                    <div><label style="margin: 0; color: var(--primary); font-size: 14px;"><i data-lucide="layers" class="lucide-sm" style="margin-right:5px;"></i> Variações / Grade</label></div>
                     <button type="button" onclick="adicionarLinhaGradeEdit()" class="btn-sistema" style="font-size: 11px; padding: 6px 12px;">+ Variação</button>
                 </div>
-                
                 <div id="container-grade-edit" style="display: flex; flex-direction: column; gap: 8px;"></div>
-                
                 <div id="container-estoque-global-edit" style="margin-top: 15px; border-top: 1px dashed rgba(0,229,176,0.2); padding-top: 15px; display: none;">
-                    <label>Qtd. Estoque Global</label>
-                    <input type="number" id="edit-qtd-produto" class="input-neon" value="0" style="max-width: 150px; margin-bottom: 0;">
+                    <label>Qtd. Estoque Global</label><input type="number" id="edit-qtd-produto" class="input-neon" value="0" style="max-width: 150px; margin-bottom: 0;">
                 </div>
             </div>
-            
             <div class="botoes-acao" style="margin-top: 25px;">
                 <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-editar-produto').style.display = 'none'">Cancelar</button>
                 <button id="btn-salvar-edicao-produto" class="btn-acao btn-enviar" onclick="salvarEdicaoProduto()">Salvar Edição</button>
@@ -371,14 +346,12 @@
         </div>
     </div>
     
-    <!-- Modal: Nova Loja -->
     <div id="modal-nova-loja" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 600px;">
             <h3>Cadastrar Loja</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                 <div>
-                    <label>Loja/Unidade *</label>
-                    <input type="text" id="loja-nome" class="input-neon" placeholder="Ex: Magazine Luiza (286)">
+                    <label>Loja/Unidade *</label><input type="text" id="loja-nome" class="input-neon" placeholder="Ex: Magazine Luiza (286)">
                     <div id="container-supervisor-loja"><label>Supervisor *</label><select id="loja-supervisor" class="input-neon" style="width: 100%;"><option value="">Carregando...</option></select></div>
                     <label>Promotor</label><input type="text" id="loja-promotor" class="input-neon">
                     <label>Contato</label><input type="text" id="loja-contato" class="input-neon">
@@ -387,10 +360,7 @@
                     <label>CEP</label><input type="text" id="loja-cep" class="input-neon">
                     <label>Rua e Número</label><input type="text" id="loja-rua" class="input-neon">
                     <label>Bairro</label><input type="text" id="loja-bairro" class="input-neon">
-                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
-                        <div><label>Cidade</label><input type="text" id="loja-cidade" class="input-neon"></div>
-                        <div><label>UF</label><input type="text" id="loja-estado" class="input-neon"></div>
-                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;"><div><label>Cidade</label><input type="text" id="loja-cidade" class="input-neon"></div><div><label>UF</label><input type="text" id="loja-estado" class="input-neon"></div></div>
                 </div>
             </div>
             <div class="botoes-acao">
@@ -400,7 +370,6 @@
         </div>
     </div>
     
-    <!-- Modal: Editar Loja -->
     <div id="modal-editar-loja" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 600px;">
             <h3>Editar Loja</h3>
@@ -416,77 +385,63 @@
                     <label>CEP</label><input type="text" id="edit-loja-cep" class="input-neon">
                     <label>Rua e Número</label><input type="text" id="edit-loja-rua" class="input-neon">
                     <label>Bairro</label><input type="text" id="edit-loja-bairro" class="input-neon">
-                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
-                        <div><label>Cidade</label><input type="text" id="edit-loja-cidade" class="input-neon"></div>
-                        <div><label>UF</label><input type="text" id="edit-loja-estado" class="input-neon"></div>
-                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;"><div><label>Cidade</label><input type="text" id="edit-loja-cidade" class="input-neon"></div><div><label>UF</label><input type="text" id="edit-loja-estado" class="input-neon"></div></div>
                 </div>
             </div>
-            <div class="botoes-acao">
-                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-editar-loja').style.display = 'none'">Cancelar</button>
-                <button id="btn-salvar-edicao-loja" class="btn-acao btn-enviar" onclick="salvarEdicaoLoja()">Salvar</button>
-            </div>
+            <div class="botoes-acao"><button class="btn-acao btn-limpar" onclick="document.getElementById('modal-editar-loja').style.display = 'none'">Cancelar</button><button id="btn-salvar-edicao-loja" class="btn-acao btn-enviar" onclick="salvarEdicaoLoja()">Salvar</button></div>
         </div>
     </div>
 
-    <!-- Modal: Novo Usuário -->
     <div id="modal-novo-usuario" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <h3>Cadastrar Colaborador</h3>
             <label>Nome Completo *</label><input type="text" id="input-nome-user" class="input-neon">
             <label>E-mail *</label><input type="email" id="input-email-user" class="input-neon">
-            <label>Senha *</label><input type="password" id="input-senha-user" class="input-neon">
-            <label>Cargo *</label>
-            <select id="select-cargo-user" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px;">
-                <option value="Supervisor">Supervisor</option>
-                <option value="Logistica">Logística</option>
-            </select>
-            <div class="botoes-acao">
-                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-novo-usuario').style.display = 'none'">Cancelar</button>
-                <button id="btn-salvar-usuario" class="btn-acao btn-enviar" onclick="salvarUsuario()">Cadastrar</button>
+            
+            <label>Senha *</label>
+            <div class="input-password-wrapper">
+                <input type="password" id="input-senha-user" class="input-neon" placeholder="Crie uma senha">
+                <button type="button" class="btn-toggle-senha" onclick="toggleSenha('input-senha-user', 'icone-senha-new')">
+                    <i id="icone-senha-new" data-lucide="eye" class="lucide-sm"></i>
+                </button>
             </div>
+            
+            <label>Cargo *</label><select id="select-cargo-user" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px;"></select>
+            <div class="botoes-acao"><button class="btn-acao btn-limpar" onclick="document.getElementById('modal-novo-usuario').style.display = 'none'">Cancelar</button><button id="btn-salvar-usuario" class="btn-acao btn-enviar" onclick="salvarUsuario()">Cadastrar</button></div>
         </div>
     </div>
     
-    <!-- Modal: Editar Usuário -->
     <div id="modal-editar-usuario" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <h3>Editar Usuário</h3>
             <input type="hidden" id="edit-id-user">
             <label>Nome Completo</label><input type="text" id="edit-nome-user" class="input-neon">
             <label>E-mail</label><input type="email" id="edit-email-user" class="input-neon">
-            <label>Senha</label><input type="text" id="edit-senha-user" class="input-neon">
-            <label>Cargo</label>
-            <select id="edit-cargo-user" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px;">
-                <option value="Supervisor">Supervisor</option>
-                <option value="Logistica">Logística</option>
-            </select>
-            <div class="botoes-acao">
-                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-editar-usuario').style.display = 'none'">Cancelar</button>
-                <button id="btn-salvar-edicao-usuario" class="btn-acao btn-enviar" onclick="salvarEdicaoUsuario()">Salvar</button>
+            
+            <label>Senha</label>
+            <div class="input-password-wrapper">
+                <input type="password" id="edit-senha-user" class="input-neon">
+                <button type="button" class="btn-toggle-senha" onclick="toggleSenha('edit-senha-user', 'icone-senha-edit')">
+                    <i id="icone-senha-edit" data-lucide="eye" class="lucide-sm"></i>
+                </button>
             </div>
+            
+            <label>Cargo</label><select id="edit-cargo-user" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px;"></select>
+            <div class="botoes-acao"><button class="btn-acao btn-limpar" onclick="document.getElementById('modal-editar-usuario').style.display = 'none'">Cancelar</button><button id="btn-salvar-edicao-usuario" class="btn-acao btn-enviar" onclick="salvarEdicaoUsuario()">Salvar</button></div>
         </div>
     </div>
 
-    <!-- Modais de Ação do Pedido: AGORA COM CONFERÊNCIA DE EXPEDIÇÃO -->
+    <!-- ================= MODAIS DA OPERAÇÃO LOGÍSTICA (IDA E VOLTA) ================= -->
+    
     <div id="modal-despacho" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 600px;">
             <h3>Conferência de Expedição</h3>
             <p style="color: var(--cor-secundaria); font-size: 13px; margin-bottom: 15px;">Ajuste a quantidade real que será enviada. O sistema estornará o estoque automaticamente em caso de rupturas.</p>
-            
             <input type="hidden" id="id-pedido-despacho">
-            
-            <div id="lista-conferencia" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
-                <!-- Preenchido via JavaScript -->
-            </div>
-
+            <div id="lista-conferencia" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
             <label>Rastreio / Observação de Envio (Opcional)</label>
             <input type="text" id="input-rastreio" class="input-neon" placeholder="Ex: BR123456789BR ou 'Enviado via motoboy'">
-            
-            <div class="botoes-acao">
-                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-despacho').style.display = 'none'">Cancelar</button>
-                <button id="btn-confirma-despacho" class="btn-acao btn-enviar" onclick="confirmarDespacho()">Confirmar e Despachar</button>
-            </div>
+            <div class="botoes-acao"><button class="btn-acao btn-limpar" onclick="document.getElementById('modal-despacho').style.display = 'none'">Cancelar</button><button id="btn-confirma-despacho" class="btn-acao btn-enviar" onclick="confirmarDespacho()">Confirmar e Despachar</button></div>
         </div>
     </div>
     
@@ -496,10 +451,7 @@
             <input type="hidden" id="id-pedido-recebimento">
             <label for="input-foto-recebimento" class="file-upload-custom"><i data-lucide="camera"></i><span id="nome-arquivo-recebimento">Tirar foto dos produtos</span></label>
             <input type="file" id="input-foto-recebimento" accept="image/*" capture="environment" style="display: none;" onchange="atualizarNomeArquivo(this, 'nome-arquivo-recebimento')">
-            <div class="botoes-acao">
-                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-recebimento').style.display = 'none'">Cancelar</button>
-                <button id="btn-confirma-recebimento" class="btn-acao btn-enviar" onclick="salvarRecebimento()">Registrar Entrega</button>
-            </div>
+            <div class="botoes-acao"><button class="btn-acao btn-limpar" onclick="document.getElementById('modal-recebimento').style.display = 'none'">Cancelar</button><button id="btn-confirma-recebimento" class="btn-acao btn-enviar" onclick="salvarRecebimento()">Registrar Entrega</button></div>
         </div>
     </div>
 
@@ -507,9 +459,51 @@
         <div class="modal-content">
             <h3>Reprovar Pedido</h3>
             <input type="hidden" id="id-pedido-reprovar">
+            <div class="botoes-acao"><button class="btn-acao btn-limpar" onclick="document.getElementById('modal-reprovar').style.display = 'none'">Voltar</button><button id="btn-confirma-reprovacao" style="background: #ff4d4d; color: #fff; padding: 14px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; flex: 1;" onclick="confirmarReprovacao()">Sim, Reprovar</button></div>
+        </div>
+    </div>
+
+    <div id="modal-solicitar-reversa" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <h3><i data-lucide="rotate-ccw" style="color: #a855f7; margin-right: 8px;"></i> Solicitar Devolução</h3>
+            <p style="color: var(--cor-secundaria); font-size: 13px; margin-bottom: 15px;">Aponte as quantidades que estão voltando para o galpão e o motivo da reversa.</p>
+            <input type="hidden" id="id-pedido-reversa">
+            
+            <div id="lista-reversa-req" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
+            
+            <label>Motivo da Devolução *</label>
+            <select id="motivo-reversa" class="input-neon" style="width: 100%; margin-bottom: 15px;">
+                <option value="Material com Defeito">Material com Defeito</option>
+                <option value="Tamanho Incorreto">Tamanho Incorreto</option>
+                <option value="Fim de Campanha / Recolhimento">Fim de Campanha / Recolhimento</option>
+                <option value="Erro no Envio da Logística">Erro no Envio da Logística</option>
+                <option value="Outros">Outros</option>
+            </select>
+            
+            <label>Foto do Pacote de Devolução (Opcional)</label>
+            <label for="input-foto-reversa" class="file-upload-custom" style="padding: 15px;">
+                <i data-lucide="image"></i><span id="nome-arquivo-reversa">Anexar foto da reversa</span>
+            </label>
+            <input type="file" id="input-foto-reversa" accept="image/*" style="display: none;" onchange="atualizarNomeArquivo(this, 'nome-arquivo-reversa')">
+            
+            <div class="botoes-acao" style="margin-top: 25px;">
+                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-solicitar-reversa').style.display = 'none'">Cancelar</button>
+                <button id="btn-enviar-reversa" class="btn-acao btn-enviar" style="background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); color: #fff;" onclick="salvarSolicitacaoReversa()">Enviar Solicitação</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-confirmar-reversa" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3><i data-lucide="check-square" style="color: #10b981; margin-right: 8px;"></i> Confirmar Retorno</h3>
+            <p style="color: var(--cor-secundaria); font-size: 13px; margin-bottom: 15px;">Ao confirmar o recebimento, os itens abaixo retornarão automaticamente para a prateleira do sistema.</p>
+            <input type="hidden" id="id-confirmar-reversa">
+            
+            <div id="conteudo-confirmar-reversa" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 20px;"></div>
+            
             <div class="botoes-acao">
-                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-reprovar').style.display = 'none'">Voltar</button>
-                <button id="btn-confirma-reprovacao" style="background: #ff4d4d; color: #fff; padding: 14px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; flex: 1;" onclick="confirmarReprovacao()">Sim, Reprovar</button>
+                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-confirmar-reversa').style.display = 'none'">Voltar</button>
+                <button id="btn-finalizar-reversa" class="btn-acao btn-enviar" style="background: #10b981; color: #fff;" onclick="confirmarReversaLogistica()">Receber e Estornar Estoque</button>
             </div>
         </div>
     </div>

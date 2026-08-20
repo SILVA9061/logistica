@@ -39,8 +39,15 @@ body { margin: 0; background-color: var(--bg-color); color: var(--cor-texto); ov
 }
 .input-neon:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(0, 229, 176, 0.2); }
 
+/* Novas Classes de Login */
+.input-password-wrapper { position: relative; margin-bottom: 15px; width: 100%; }
+.input-password-wrapper .input-neon { margin-bottom: 0; padding-right: 45px; }
+.btn-toggle-senha { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--cor-secundaria); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; transition: 0.3s;}
+.btn-toggle-senha:hover { color: var(--primary); }
+.login-error-card { display: none; background: rgba(255, 77, 77, 0.1); border: 1px solid rgba(255, 77, 77, 0.3); color: #ff4d4d; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: bold; margin-bottom: 20px; text-align: left; align-items: center; gap: 8px; }
+
 .btn-neon {
-    width: 100%; padding: 15px; margin-top: 15px; border-radius: 12px; border: none;
+    width: 100%; padding: 15px; margin-top: 5px; border-radius: 12px; border: none;
     background: var(--primary-gradiente); color: #002b22; font-weight: 800; cursor: pointer; transition: 0.3s; box-shadow: 0 0 20px rgba(0, 229, 176, 0.3);
 }
 .btn-neon:hover { transform: translateY(-2px); box-shadow: 0 5px 25px rgba(0, 229, 176, 0.5); }
@@ -116,7 +123,7 @@ select:focus { border-color: var(--primary) !important; box-shadow: 0 0 8px rgba
 .custom-option:hover { background: rgba(0, 229, 176, 0.2); color: var(--primary); }
 
 /* ================= DASHBOARD INTERATIVO ================= */
-.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
 .dash-card { 
     background: #13171c; padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); 
     display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: all 0.3s ease; 
@@ -128,29 +135,33 @@ select:focus { border-color: var(--primary) !important; box-shadow: 0 0 8px rgba
 .dash-card.pendente { border-left: 4px solid #f59e0b; }
 .dash-card.enviado { border-left: 4px solid #3b82f6; }
 .dash-card.entregue { border-left: 4px solid #10b981; }
+.dash-card.reversa { border-left: 4px solid #a855f7; }
 .dash-card.alerta { border-left: 4px solid #ff4d4d; }
 
 .dash-card.pendente.card-ativo { background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); }
 .dash-card.enviado.card-ativo { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); }
 .dash-card.entregue.card-ativo { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); }
+.dash-card.reversa.card-ativo { background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); }
 .dash-card.alerta.card-ativo { background: rgba(255, 77, 77, 0.15); border-color: rgba(255, 77, 77, 0.4); }
 .dash-card.card-ativo h4 { color: #fff; font-weight: bold; }
 
 /* ================= ABAS ================= */
-.abas-container { display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
-.aba-btn { background: transparent; color: var(--cor-secundaria); border: none; font-size: 15px; font-weight: bold; cursor: pointer; padding: 5px 10px; transition: all 0.3s; }
+.abas-container { display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; overflow-x: auto; }
+.aba-btn { background: transparent; color: var(--cor-secundaria); border: none; font-size: 15px; font-weight: bold; cursor: pointer; padding: 5px 10px; transition: all 0.3s; white-space: nowrap; }
 .aba-btn:hover { color: #fff; }
 .aba-btn.ativo { color: var(--primary); border-bottom: 2px solid var(--primary); }
 
-/* ================= ITENS DO PEDIDO ================= */
+/* ================= ITENS DO PEDIDO E TAGS ================= */
 .item-pedido-linha { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 10px 15px; border-radius: 8px; margin-bottom: 8px; }
 .item-pedido-linha input[type="number"] { width: 60px; padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.5); color: #fff; text-align: center; }
 .btn-ver-lista { background: transparent; color: var(--primary); border: 1px solid var(--primary); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; transition: 0.2s; }
 .btn-ver-lista:hover { background: rgba(0, 229, 176, 0.1); }
+
 .tag-alerta { display: inline-block; background: rgba(255, 77, 77, 0.1); color: #ff4d4d; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid rgba(255, 77, 77, 0.2); margin-bottom: 5px; }
 .tag-parcial { display: inline-block; background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-top: 5px; border: 1px solid rgba(245, 158, 11, 0.3); }
+.tag-reversa { display: inline-block; background: rgba(168, 85, 247, 0.15); color: #a855f7; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-top: 5px; border: 1px solid rgba(168, 85, 247, 0.3); }
 
-/* ================= CONFERÊNCIA DE EXPEDIÇÃO ================= */
+/* ================= CONFERÊNCIA DE EXPEDIÇÃO & REVERSA ================= */
 .linha-conferencia {
     display: flex; justify-content: space-between; align-items: center;
     background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
@@ -208,7 +219,6 @@ select:focus { border-color: var(--primary) !important; box-shadow: 0 0 8px rgba
 .var-nome { color: #fff; font-weight: bold; }
 .var-estoque { color: var(--cor-secundaria); font-size: 10px; }
 
-/* Chips para a visão do Admin */
 .var-chips-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
 .var-chip {
     background: rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 6px;
@@ -224,7 +234,7 @@ select:focus { border-color: var(--primary) !important; box-shadow: 0 0 8px rgba
 .galeria-fotos img:hover { transform: scale(1.05); border-color: var(--primary); }
 
 /* ================= TOASTS, SCROLLBAR E ANIMAÇÕES ================= */
-.toast { display: flex; align-items: center; gap: 12px; padding: 15px 20px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500; transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55); box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: pointer; }
+.toast { display: flex; align-items: center; gap: 12px; padding: 15px 20px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500; transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55); box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: pointer; z-index: 100000;}
 .toast.show { transform: translateX(0); }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -236,83 +246,44 @@ select:focus { border-color: var(--primary) !important; box-shadow: 0 0 8px rgba
 @keyframes spin { 100% { transform: rotate(360deg); } }
 .spinner { animation: spin 1s linear infinite; display: inline-block; }
 
-/* ================= IMPRESSÃO E PDF (ROMANEIO) ================= */
-@media print {
-    body * { visibility: hidden; }
-    #modal-ver-pedido, #modal-ver-pedido * { visibility: visible; }
-    #modal-ver-pedido { 
-        position: absolute; left: 0; top: 0; width: 100%; 
-        background: #ffffff !important; color: #000000 !important; 
-        box-shadow: none; border: none; padding: 0; 
-    }
-    .modal-content { 
-        background: #ffffff !important; border: none; 
-        width: 100%; max-width: 100%; padding: 20px; 
-    }
-    #picking-list-conteudo * { color: #000000 !important; }
-    .botoes-acao, .btn-sistema, .header-actions, .galeria-fotos, button { display: none !important; }
-    li { 
-        background: #f0f0f0 !important; 
-        border-left-color: #000000 !important; 
-        -webkit-print-color-adjust: exact; 
-        print-color-adjust: exact; 
-    }
-}
-/* ================= RESPONSIVIDADE MOBILE (SMARTPHONES) ================= */
+/* ================= RESPONSIVIDADE MOBILE ================= */
 .mobile-header {
-    display: none;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 20px;
-    background: #0b0f13;
-    border-bottom: 1px solid var(--border-color);
-    z-index: 1000;
+    display: none; justify-content: space-between; align-items: center;
+    padding: 15px 20px; background: #0b0f13; border-bottom: 1px solid var(--border-color); z-index: 1000;
 }
-
-#menu-overlay {
-    display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0,0,0,0.7); z-index: 999; backdrop-filter: blur(3px);
-}
+#menu-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 999; backdrop-filter: blur(3px); }
 
 @media (max-width: 768px) {
     #tela-app { flex-direction: column; }
     .mobile-header { display: flex; }
-    
-    /* Transforma a barra em gaveta lateral */
-    .sidebar-desktop {
-        position: fixed;
-        top: 0;
-        left: -300px;
-        height: 100vh;
-        z-index: 1001;
-        transition: left 0.3s ease;
-        box-shadow: 5px 0 25px rgba(0,0,0,0.8);
-    }
+    .sidebar-desktop { position: fixed; top: 0; left: -300px; height: 100vh; z-index: 1001; transition: left 0.3s ease; box-shadow: 5px 0 25px rgba(0,0,0,0.8); }
     .sidebar-desktop.aberto { left: 0; }
-    
-    /* Reorganiza o Layout Interno */
     .container-wide { padding: 15px; }
     .header-global { flex-direction: column; align-items: flex-start; gap: 15px; }
     .header-global h2 { font-size: 22px; }
     .header-actions { width: 100%; flex-direction: column; align-items: stretch; }
     .header-actions button, .custom-select-wrapper { width: 100%; }
-    
-    /* Dashboard em 2 colunas no mobile */
     .dashboard-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
     .dash-card { padding: 15px; }
     .dash-card h2 { font-size: 22px; }
-    
-    /* Tabelas com scroll horizontal nativo */
     .card-padrao { padding: 15px; overflow-x: auto; }
     .tabela-logistica th, .tabela-logistica td { padding: 10px; font-size: 13px; white-space: nowrap; }
-    
-    /* Modais em tela cheia */
     .modal-content { width: 95%; max-height: 95vh; padding: 20px; }
     .botoes-acao { flex-direction: column; }
 }
 
 @media (max-width: 480px) {
-    /* Em telas muito finas, os cards ficam 1 em cima do outro */
     .dashboard-grid { grid-template-columns: 1fr; }
     .vitrine-grid { grid-template-columns: 1fr; }
+}
+
+/* ================= IMPRESSÃO ================= */
+@media print {
+    body * { visibility: hidden; }
+    #modal-ver-pedido, #modal-ver-pedido * { visibility: visible; }
+    #modal-ver-pedido { position: absolute; left: 0; top: 0; width: 100%; background: #ffffff !important; color: #000000 !important; box-shadow: none; border: none; padding: 0; }
+    .modal-content { background: #ffffff !important; border: none; width: 100%; max-width: 100%; padding: 20px; }
+    #picking-list-conteudo * { color: #000000 !important; }
+    .botoes-acao, .btn-sistema, .header-actions, .galeria-fotos, button { display: none !important; }
+    li { background: #f0f0f0 !important; border-left-color: #000000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
