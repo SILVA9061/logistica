@@ -231,6 +231,15 @@
         </div>
     </div>
 
+    <!-- ================= LIGHTBOX VISUALIZADOR DE IMAGENS ================= -->
+    <div id="lightbox-overlay" style="display: none;" onclick="fecharLightbox(false, event)">
+        <div class="lightbox-acoes">
+            <a id="btn-download-lightbox" href="#" target="_blank" title="Baixar Imagem Original"><i data-lucide="download"></i></a>
+            <button onclick="fecharLightbox(true)" title="Fechar Janela"><i data-lucide="x"></i></button>
+        </div>
+        <img id="lightbox-img" src="" alt="Imagem Ampliada">
+    </div>
+
     <!-- ================= MODAIS GLOBAIS DE AÇÃO ================= -->
     
     <div id="modal-confirmacao" class="modal-overlay" style="display: none; z-index: 100000;">

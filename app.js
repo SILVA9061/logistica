@@ -23,7 +23,7 @@ document.getElementById('tela-pedidos').addEventListener('scroll', function() {
 });
 
 // ==========================================
-// 2. FUNÇÕES AUXILIARES E UI
+// 2. FUNÇÕES AUXILIARES, MODAIS GLOBAIS E UI
 // ==========================================
 function toggleMenuMobile() {
     const sidebar = document.getElementById('sidebar');
@@ -74,6 +74,41 @@ function setCarregamento(btnId, isCarregando, textoCarregando = 'Aguarde...') {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+// ==========================================
+// LIGHTBOX (VISUALIZADOR DE FOTOS EM TELA CHEIA)
+// ==========================================
+function abrirLightbox(urlOriginal) {
+    const overlay = document.getElementById('lightbox-overlay');
+    const img = document.getElementById('lightbox-img');
+    const btnDownload = document.getElementById('btn-download-lightbox');
+    
+    let linkDownload = urlOriginal;
+    let id = '';
+    
+    // Se for do Google Drive, nós forçamos o link direto de download de alta qualidade
+    if (urlOriginal.includes('/d/')) id = urlOriginal.split('/d/')[1].split('/')[0];
+    else if (urlOriginal.includes('id=')) id = urlOriginal.split('id=')[1].split('&')[0];
+    
+    if (id) {
+        linkDownload = `https://drive.google.com/uc?export=download&id=${id}`;
+        img.src = `https://drive.google.com/thumbnail?id=${id}&sz=w1920`;
+    } else {
+        img.src = urlOriginal;
+    }
+    
+    btnDownload.href = linkDownload;
+    overlay.style.display = 'flex';
+    lucide.createIcons();
+}
+
+function fecharLightbox(forcar = false, evento = null) {
+    // Só fecha se forçado pelo botão ou se o usuário clicar exatamente no fundo preto
+    if (forcar || (evento && evento.target.id === 'lightbox-overlay')) {
+        document.getElementById('lightbox-overlay').style.display = 'none';
+        document.getElementById('lightbox-img').src = '';
+    }
+}
+
 let arquivosBancada = [];
 function lidarComSelecaoDeFotos(input) { if (input.files) { Array.from(input.files).forEach(file => { if(file.type.startsWith('image/')) arquivosBancada.push(file); }); } input.value = ''; renderizarMiniaturasBancada(); }
 function removerFotoBancada(index) { arquivosBancada.splice(index, 1); renderizarMiniaturasBancada(); }
@@ -96,9 +131,7 @@ function atualizarNomeArquivo(input, idTexto) {
     if (input.files.length === 1) span.innerText = "Arquivo: " + input.files[0].name; else if (input.files.length > 1) span.innerText = `${input.files.length} arquivos selecionados`; else span.innerText = "Clique para anexar foto";
 }
 
-// OTIMIZADO PARA MAIOR RAPIDEZ
 async function fazerUploadDrive(file, prefixo) {
-    // Reduzido para 1.5MB e 1920px (Full HD). Mais do que suficiente e carrega super rápido
     const fotoComprimida = await imageCompression(file, { maxSizeMB: 1.5, maxWidthOrHeight: 1920, useWebWorker: true, initialQuality: 0.8 });
     const base64 = await new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result.split(',')[1]); reader.readAsDataURL(fotoComprimida); });
     const resposta = await fetch(URL_GOOGLE_SCRIPT, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ base64: base64, nomeArquivo: `${prefixo}_${Date.now()}.jpg`, mimeType: fotoComprimida.type }) });
@@ -390,7 +423,6 @@ async function excluirLoja(id, btn) {
     });
 }
 
-// OTIMIZADO: Controle Rígido Hierárquico
 async function carregarTabelaUsuarios() {
     const tbody = document.getElementById('tabela-usuarios-admin'); if(!tbody) return;
     const { data } = await supabaseClient.from('usuarios').select('*').order('nome'); tbody.innerHTML = ''; 
@@ -527,7 +559,6 @@ function renderizarVitrinePedido() {
     }); lucide.createIcons();
 }
 
-// OTIMIZADO: Uploads e Banco de Dados Paralelos (Mais Rápido)
 async function salvarSolicitacao() {
     const lojaId = document.getElementById('select-loja').value; const itensSelecionados = memoriaCatalogoPedido.filter(i => i.qtdSelecionada > 0);
     if (!lojaId) return mostrarAviso('Selecione a Loja/Destino!', 'erro'); if (itensSelecionados.length === 0) return mostrarAviso('Adicione pelo menos um material!', 'erro'); if (arquivosBancada.length === 0) return mostrarAviso('Anexe as fotos da bancada!', 'erro');
@@ -540,13 +571,12 @@ async function salvarSolicitacao() {
         const novoEstoque = estoqueAtual - qtdPedida; atualizacoesEstoque.push({ id: item.id, quantidade: novoEstoque < 0 ? 0 : novoEstoque, nome: nomeFinalFormato, baixado: qtdPedida });
     });
 
-    let detalhes = itensPedido.join(', '); if (temFalta) detalhes = `[⚠️ CONTÉM ITEM SEM ESTOQUE] ` + detalhes;
+    let detalhes = itensPedido.join(', '); if (temFalta) detalhes = `[CONTÉM ITEM SEM ESTOQUE] ` + detalhes;
     setCarregamento('btn-enviar-pedido', true, 'Processando Pedido...');
 
     try {
         let urlsBancada = [];
         try { 
-            // Paraleliza os uploads do Google Drive (Muito mais rápido)
             const uploadPromises = arquivosBancada.map((file, i) => fazerUploadDrive(file, `bancada_${i+1}`));
             urlsBancada = await Promise.all(uploadPromises);
         } catch (errDrive) { console.error("Erro Drive:", errDrive); mostrarAviso('Falha no upload das fotos. Enviando sem imagens.', 'erro'); }
@@ -554,7 +584,6 @@ async function salvarSolicitacao() {
         const { error: erroInsert } = await supabaseClient.from('pedidos').insert([{ loja_id: lojaId, detalhes, foto_url: urlsBancada.join(','), status: 'Pendente' }]); 
         if (erroInsert) throw erroInsert;
         
-        // Paraleliza os updates do Banco (Muito mais rápido)
         const promessasBD = [];
         atualizacoesEstoque.forEach(item => {
             promessasBD.push(supabaseClient.from('catalogo').update({ quantidade: item.quantidade }).eq('id', item.id));
@@ -567,7 +596,7 @@ async function salvarSolicitacao() {
 }
 
 // ==========================================
-// 7. DASHBOARD E WORKFLOW DE PEDIDOS (COM LOGÍSTICA REVERSA)
+// 7. DASHBOARD E WORKFLOW DE PEDIDOS
 // ==========================================
 function filtrarPorCard(status) {
     if (filtroCardAtivo === status) { filtroCardAtivo = null; document.getElementById('card-' + status).classList.remove('card-ativo'); }
@@ -707,11 +736,10 @@ async function carregarPedidos(reset = true) {
 function abrirModalVerPedido(id) {
     const p = memoriaPedidos.find(x => x.id === id); if (!p) return;
     
-    // Tratamento Inteligente para Reversa no Modal
     let detalhesLimpos = p.detalhes.split('||_REV_')[0];
     let reversaJson = p.detalhes.includes('||_REV_') ? JSON.parse(p.detalhes.split('||_REV_')[1]) : null;
 
-    let listaItensRaw = detalhesLimpos.replace('[⚠️ CONTÉM ITEM SEM ESTOQUE]', '').replace('[ATENDIMENTO PARCIAL]', '').trim();
+    let listaItensRaw = detalhesLimpos.replace('[CONTÉM ITEM SEM ESTOQUE]', '').replace('[ATENDIMENTO PARCIAL]', '').trim();
     if(listaItensRaw.startsWith(',')) listaItensRaw = listaItensRaw.substring(1).trim();
     
     let listaHtml = `<ul style="list-style: none; padding: 0; margin-bottom: 15px;">`;
@@ -734,31 +762,34 @@ function abrirModalVerPedido(id) {
     let prom = end ? `${end.promotor_nome || 'Não info.'} (${end.promotor_contato || 'S/N'})` : '';
     
     let galeriaHtml = '';
+    
+    // ==========================================
+    // AGORA COM LIGHTBOX INTEGRADO NAS IMAGENS
+    // ==========================================
     if (p.foto_url) {
         galeriaHtml += `<p style="margin: 15px 0 5px 0; color: var(--primary); font-size: 12px; font-weight: bold;">FOTOS DA BANCADA</p><div class="galeria-fotos">`;
-        p.foto_url.split(',').forEach(url => { galeriaHtml += `<a href="${url.trim()}" target="_blank"><img src="${consertarLinkGoogleDrive(url.trim())}" loading="lazy"></a>`; });
+        p.foto_url.split(',').forEach(url => { galeriaHtml += `<img src="${consertarLinkGoogleDrive(url.trim())}" loading="lazy" onclick="abrirLightbox('${url.trim()}')">`; });
         galeriaHtml += `</div>`;
     }
     if (p.foto_recebimento_url) {
         galeriaHtml += `<p style="margin: 15px 0 5px 0; color: #10b981; font-size: 12px; font-weight: bold;">FOTO DA ENTREGA</p><div class="galeria-fotos">`;
-        p.foto_recebimento_url.split(',').forEach(url => { galeriaHtml += `<a href="${url.trim()}" target="_blank"><img src="${consertarLinkGoogleDrive(url.trim())}" loading="lazy" style="border-color: #10b981;"></a>`; });
+        p.foto_recebimento_url.split(',').forEach(url => { galeriaHtml += `<img src="${consertarLinkGoogleDrive(url.trim())}" loading="lazy" style="border-color: #10b981;" onclick="abrirLightbox('${url.trim()}')">`; });
         galeriaHtml += `</div>`;
     }
     if (reversaJson && reversaJson.foto_url) {
         galeriaHtml += `<p style="margin: 15px 0 5px 0; color: #a855f7; font-size: 12px; font-weight: bold;">FOTO DA DEVOLUÇÃO</p><div class="galeria-fotos">`;
-        galeriaHtml += `<a href="${reversaJson.foto_url}" target="_blank"><img src="${consertarLinkGoogleDrive(reversaJson.foto_url)}" loading="lazy" style="border-color: #a855f7;"></a></div>`;
+        galeriaHtml += `<img src="${consertarLinkGoogleDrive(reversaJson.foto_url)}" loading="lazy" style="border-color: #a855f7;" onclick="abrirLightbox('${reversaJson.foto_url}')"></div>`;
     }
     
     document.getElementById('picking-list-conteudo').innerHTML = `<div style="margin-bottom: 15px;"><p style="margin: 0; color: var(--primary); font-size: 12px; font-weight: bold;">DESTINO</p><h4 style="color: #fff; margin: 5px 0;">${end ? end.nome : 'Excluída'}</h4><p style="margin: 0; font-size: 13px;">${endHtml}</p><p style="margin: 5px 0 0 0; font-size: 13px; color: var(--cor-secundaria);">Promotor: ${prom}</p></div><div style="margin-bottom: 15px;"><p style="margin: 0 0 10px 0; color: var(--primary); font-size: 12px; font-weight: bold;">LISTA DE SEPARAÇÃO</p>${listaHtml}</div>${reversaHtml}${galeriaHtml}`;
     document.getElementById('modal-ver-pedido').style.display = 'flex'; lucide.createIcons();
 }
 
-// === IDA (DESPACHO) ===
 function abrirModalDespacho(id) {
     document.getElementById('id-pedido-despacho').value = id; document.getElementById('input-rastreio').value = '';
     const pedido = memoriaPedidos.find(p => p.id === id); if (!pedido) return;
 
-    let itensRaw = pedido.detalhes.split('||_REV_')[0].replace('[⚠️ CONTÉM ITEM SEM ESTOQUE]', '').replace('[ATENDIMENTO PARCIAL]', '').trim();
+    let itensRaw = pedido.detalhes.split('||_REV_')[0].replace('[CONTÉM ITEM SEM ESTOQUE]', '').replace('[ATENDIMENTO PARCIAL]', '').trim();
     if(itensRaw.startsWith(',')) itensRaw = itensRaw.substring(1).trim();
 
     const listaContainer = document.getElementById('lista-conferencia'); listaContainer.innerHTML = '';
@@ -798,7 +829,7 @@ async function confirmarDespacho() {
         }
 
         let stringFinal = novoDetalhes.join(', ');
-        if (houveRuptura) { stringFinal = '[ATENDIMENTO PARCIAL] ' + stringFinal; } else if (pedidoOriginal.detalhes.includes('[⚠️ CONTÉM ITEM SEM ESTOQUE]')) { stringFinal = '[⚠️ CONTÉM ITEM SEM ESTOQUE] ' + stringFinal; }
+        if (houveRuptura) { stringFinal = '[ATENDIMENTO PARCIAL] ' + stringFinal; } else if (pedidoOriginal.detalhes.includes('[CONTÉM ITEM SEM ESTOQUE]')) { stringFinal = '[CONTÉM ITEM SEM ESTOQUE] ' + stringFinal; }
 
         promessasBD.push(supabaseClient.from('pedidos').update({ status: 'Enviado', codigo_rastreio: rastreio, detalhes: stringFinal }).eq('id', id));
         await Promise.allSettled(promessasBD);
@@ -825,17 +856,13 @@ async function confirmarReprovacao() {
     catch (e) { mostrarAviso('Erro ao reprovar.', 'erro'); } finally { setCarregamento('btn-confirma-reprovacao', false); }
 }
 
-// === VOLTA (LOGÍSTICA REVERSA) ===
 function abrirModalSolicitarReversa(id) {
-    document.getElementById('id-pedido-reversa').value = id;
-    document.getElementById('input-foto-reversa').value = '';
-    document.getElementById('nome-arquivo-reversa').innerText = 'Anexar foto da reversa';
-    document.getElementById('motivo-reversa').selectedIndex = 0;
+    document.getElementById('id-pedido-reversa').value = id; document.getElementById('input-foto-reversa').value = ''; document.getElementById('nome-arquivo-reversa').innerText = 'Anexar foto da reversa'; document.getElementById('motivo-reversa').selectedIndex = 0;
     
     const pedido = memoriaPedidos.find(p => p.id === id); if (!pedido) return;
     const listaContainer = document.getElementById('lista-reversa-req'); listaContainer.innerHTML = '';
 
-    let detalhesLimpos = pedido.detalhes.split('||_REV_')[0].replace('[⚠️ CONTÉM ITEM SEM ESTOQUE]', '').replace('[ATENDIMENTO PARCIAL]', '').trim();
+    let detalhesLimpos = pedido.detalhes.split('||_REV_')[0].replace('[CONTÉM ITEM SEM ESTOQUE]', '').replace('[ATENDIMENTO PARCIAL]', '').trim();
     if(detalhesLimpos.startsWith(',')) detalhesLimpos = detalhesLimpos.substring(1).trim();
 
     detalhesLimpos.split(',').forEach((itemStr, index) => {
@@ -848,28 +875,20 @@ function abrirModalSolicitarReversa(id) {
             }
         }
     });
-
     document.getElementById('modal-solicitar-reversa').style.display = 'flex'; lucide.createIcons();
 }
 
 async function salvarSolicitacaoReversa() {
-    const id = document.getElementById('id-pedido-reversa').value;
-    const motivo = document.getElementById('motivo-reversa').value;
-    const pedidoOriginal = memoriaPedidos.find(p => p.id == id); if (!pedidoOriginal) return;
+    const id = document.getElementById('id-pedido-reversa').value; const motivo = document.getElementById('motivo-reversa').value; const pedidoOriginal = memoriaPedidos.find(p => p.id == id); if (!pedidoOriginal) return;
 
-    let itensDevolvidos = [];
-    const inputs = document.querySelectorAll('#lista-reversa-req .input-conferencia');
-    
+    let itensDevolvidos = []; const inputs = document.querySelectorAll('#lista-reversa-req .input-conferencia');
     for (let input of inputs) {
-        const nomeItem = input.getAttribute('data-nome');
-        const qtdDevolvida = parseInt(input.value) || 0;
+        const nomeItem = input.getAttribute('data-nome'); const qtdDevolvida = parseInt(input.value) || 0;
         if (qtdDevolvida > 0) { itensDevolvidos.push({ nome: nomeItem, qtd: qtdDevolvida, motivo: motivo }); }
     }
-
     if (itensDevolvidos.length === 0) return mostrarAviso('Aponte pelo menos 1 item para devolução.', 'erro');
 
     setCarregamento('btn-enviar-reversa', true, 'Solicitando...');
-
     try {
         let fotoUrl = null; const f = document.getElementById('input-foto-reversa');
         if (f.files.length > 0) { try { fotoUrl = await fazerUploadDrive(f.files[0], 'reversa'); } catch(e) { console.error(e); } }
@@ -879,36 +898,29 @@ async function salvarSolicitacaoReversa() {
 
         await supabaseClient.from('pedidos').update({ status: 'Aguardando Reversa', detalhes: detalhesAtualizados }).eq('id', id);
         mostrarAviso('Logística Reversa Solicitada!', 'sucesso'); document.getElementById('modal-solicitar-reversa').style.display = 'none'; carregarPedidos(true);
-
     } catch (e) { mostrarAviso('Erro ao solicitar reversa.', 'erro'); console.error(e); } finally { setCarregamento('btn-enviar-reversa', false); }
 }
 
 function abrirModalConfirmarReversa(id) {
     document.getElementById('id-confirmar-reversa').value = id;
     const pedido = memoriaPedidos.find(p => p.id === id); if (!pedido) return;
-
     if (!pedido.detalhes.includes('||_REV_')) return mostrarAviso('Dados da reversa não encontrados.', 'erro');
     
     const revData = JSON.parse(pedido.detalhes.split('||_REV_')[1]);
-    const listaContainer = document.getElementById('conteudo-confirmar-reversa');
-    listaContainer.innerHTML = '';
+    const listaContainer = document.getElementById('conteudo-confirmar-reversa'); listaContainer.innerHTML = '';
     
     revData.itens.forEach(item => {
         listaContainer.innerHTML += `<div style="display:flex; justify-content:space-between; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px;"><span style="color:#fff;">${item.qtd}x <strong>${item.nome}</strong></span><span style="color:var(--cor-secundaria); font-size:12px;">${item.motivo}</span></div>`;
     });
-
     document.getElementById('modal-confirmar-reversa').style.display = 'flex'; lucide.createIcons();
 }
 
 async function confirmarReversaLogistica() {
-    const id = document.getElementById('id-confirmar-reversa').value;
-    const pedido = memoriaPedidos.find(p => p.id == id); if (!pedido) return;
+    const id = document.getElementById('id-confirmar-reversa').value; const pedido = memoriaPedidos.find(p => p.id == id); if (!pedido) return;
 
     setCarregamento('btn-finalizar-reversa', true, 'Estornando...');
     try {
-        const revData = JSON.parse(pedido.detalhes.split('||_REV_')[1]);
-        const promessasBD = [];
-        
+        const revData = JSON.parse(pedido.detalhes.split('||_REV_')[1]); const promessasBD = [];
         for (let item of revData.itens) {
             const { data: catData } = await supabaseClient.from('catalogo').select('id, quantidade').eq('nome', item.nome).single();
             if (catData) {
@@ -917,7 +929,6 @@ async function confirmarReversaLogistica() {
                 promessasBD.push(supabaseClient.from('logs_estoque').insert([{ material: item.nome, quantidade_movimentada: item.qtd, responsavel: usuarioLogado.nome, motivo: `Logística Reversa: ${item.motivo}` }]));
             }
         }
-
         promessasBD.push(supabaseClient.from('pedidos').update({ status: 'Reversa Concluída' }).eq('id', id));
         await Promise.allSettled(promessasBD);
         
@@ -939,23 +950,22 @@ function exportarExcel() {
         const promotor = p.lojas ? p.lojas.promotor_nome : '';
         const dataPedido = new Date(p.created_at).toLocaleDateString('pt-BR');
         
-        let stringLimpa = p.detalhes.split('||_REV_')[0].replace('[⚠️ CONTÉM ITEM SEM ESTOQUE]', '(RUPTURA NA ORIGEM)');
+        let stringLimpa = p.detalhes.split('||_REV_')[0].replace('[CONTÉM ITEM SEM ESTOQUE]', '(RUPTURA NA ORIGEM)');
         let notaReversa = p.detalhes.includes('||_REV_') ? 'SIM (Verificar Histórico)' : 'NÃO';
 
         return {
-            "ID": p.id,
-            "Data Solicitação": dataPedido,
-            "Status Atual": p.status,
+            "ID do Pedido": p.id,
+            "Data da Solicitação": dataPedido,
+            "Status": p.status,
             "Destino (Loja)": loja,
             "Supervisor Responsável": supervisor,
-            "Promotor": promotor,
-            "Itens Entregues/Enviados": stringLimpa,
-            "Houve Reversa?": notaReversa,
-            "Rastreio": p.codigo_rastreio || 'N/A'
+            "Promotor na Loja": promotor,
+            "Itens Solicitados": stringLimpa,
+            "Rastreio de Envio": p.codigo_rastreio || 'N/A'
         };
     });
 
     const worksheet = XLSX.utils.json_to_sheet(dadosExcel); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, "Pedidos Logística");
-    worksheet['!cols'] = [{wch: 8}, {wch: 15}, {wch: 15}, {wch: 30}, {wch: 25}, {wch: 20}, {wch: 80}, {wch: 15}, {wch: 20}];
+    worksheet['!cols'] = [{wch: 15}, {wch: 20}, {wch: 15}, {wch: 35}, {wch: 25}, {wch: 25}, {wch: 80}, {wch: 25}];
     const dataHoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-'); XLSX.writeFile(workbook, `Relatorio_Logistica_OPPO_${dataHoje}.xlsx`);
 }
