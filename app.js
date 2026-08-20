@@ -29,6 +29,21 @@ document.getElementById('tela-pedidos').addEventListener('scroll', function() {
 // ==========================================
 // 2. FUNÇÕES AUXILIARES, MODAIS GLOBAIS E UI
 // ==========================================
+
+// Função para abrir e fechar o Menu Mobile
+function toggleMenuMobile() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('menu-overlay');
+    
+    if (sidebar.classList.contains('aberto')) {
+        sidebar.classList.remove('aberto');
+        overlay.style.display = 'none';
+    } else {
+        sidebar.classList.add('aberto');
+        overlay.style.display = 'block';
+    }
+}
+
 function mostrarAviso(mensagem, tipo = 'erro') {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -253,6 +268,10 @@ function renderizarMenuDinamico() {
 }
 
 function mostrarTela(idTela) {
+    // Esconde o menu mobile se ele estiver aberto
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.classList.contains('aberto')) toggleMenuMobile();
+
     ['tela-pedidos', 'tela-fazer-pedido', 'tela-gerenciar-catalogo', 'tela-gerenciar-usuarios'].forEach(tela => { 
         const el = document.getElementById(tela); if (el) el.style.display = (tela === idTela) ? 'block' : 'none'; 
     });
@@ -726,7 +745,7 @@ function renderizarVitrinePedido() {
             if(v.qtdSelecionada > 0) selecionadoGeral = true;
             const classeFalta = v.quantidade <= 0 ? 'color: #ff4d4d;' : '';
             
-            // NOVIDADE: Oculta a quantidade exata para o Supervisor
+            // Oculta a quantidade exata para o Supervisor
             let textoEstoque = '';
             if (usuarioLogado.cargo === 'Supervisor') {
                 textoEstoque = v.quantidade > 0 ? 'Disponível' : 'Indisponível (Falta)';

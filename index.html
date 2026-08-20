@@ -8,6 +8,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0b0f13">
     <link rel="stylesheet" href="style.css">
+    <link rel="apple-touch-icon" href="icone-oppo-512.png">
     
     <!-- Bibliotecas Externas -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -52,8 +53,22 @@
     <!-- ================= ESTRUTURA DO APP ================= -->
     <div id="tela-app" style="display: none; width: 100%; height: 100vh;">
         
+        <!-- CABEÇALHO MOBILE (Só aparece no celular) -->
+        <div class="mobile-header">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="logo-icon" style="margin:0;">O</div>
+                <h3 style="margin: 0; color: #fff;">Logística OPPO</h3>
+            </div>
+            <button onclick="toggleMenuMobile()" style="background: transparent; border: none; color: var(--primary); cursor: pointer; padding: 0;">
+                <i data-lucide="menu" style="width: 32px; height: 32px;"></i>
+            </button>
+        </div>
+        
+        <!-- MÁSCARA ESCURA DO MENU MOBILE -->
+        <div id="menu-overlay" onclick="toggleMenuMobile()"></div>
+
         <!-- BARRA LATERAL DINÂMICA -->
-        <aside class="sidebar-desktop">
+        <aside class="sidebar-desktop" id="sidebar">
             <div class="sidebar-logo">
                 <div class="logo-icon">O</div>
                 <div>Logística OPPO<br><span id="label-nome-usuario" style="font-size: 11px; color: var(--cor-secundaria);">Carregando...</span></div>

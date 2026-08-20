@@ -258,3 +258,61 @@ select:focus { border-color: var(--primary) !important; box-shadow: 0 0 8px rgba
         print-color-adjust: exact; 
     }
 }
+/* ================= RESPONSIVIDADE MOBILE (SMARTPHONES) ================= */
+.mobile-header {
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: #0b0f13;
+    border-bottom: 1px solid var(--border-color);
+    z-index: 1000;
+}
+
+#menu-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.7); z-index: 999; backdrop-filter: blur(3px);
+}
+
+@media (max-width: 768px) {
+    #tela-app { flex-direction: column; }
+    .mobile-header { display: flex; }
+    
+    /* Transforma a barra em gaveta lateral */
+    .sidebar-desktop {
+        position: fixed;
+        top: 0;
+        left: -300px;
+        height: 100vh;
+        z-index: 1001;
+        transition: left 0.3s ease;
+        box-shadow: 5px 0 25px rgba(0,0,0,0.8);
+    }
+    .sidebar-desktop.aberto { left: 0; }
+    
+    /* Reorganiza o Layout Interno */
+    .container-wide { padding: 15px; }
+    .header-global { flex-direction: column; align-items: flex-start; gap: 15px; }
+    .header-global h2 { font-size: 22px; }
+    .header-actions { width: 100%; flex-direction: column; align-items: stretch; }
+    .header-actions button, .custom-select-wrapper { width: 100%; }
+    
+    /* Dashboard em 2 colunas no mobile */
+    .dashboard-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .dash-card { padding: 15px; }
+    .dash-card h2 { font-size: 22px; }
+    
+    /* Tabelas com scroll horizontal nativo */
+    .card-padrao { padding: 15px; overflow-x: auto; }
+    .tabela-logistica th, .tabela-logistica td { padding: 10px; font-size: 13px; white-space: nowrap; }
+    
+    /* Modais em tela cheia */
+    .modal-content { width: 95%; max-height: 95vh; padding: 20px; }
+    .botoes-acao { flex-direction: column; }
+}
+
+@media (max-width: 480px) {
+    /* Em telas muito finas, os cards ficam 1 em cima do outro */
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .vitrine-grid { grid-template-columns: 1fr; }
+}
