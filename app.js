@@ -461,13 +461,13 @@ async function salvarProduto() {
                 if(varName) { 
                     const { error } = await supabaseClient.from('catalogo').insert([{ 
                         nome: `${nomeBase} (${varName})`, categoria: categoria, subcategoria: subCatBase ? `${subCatBase} | ${varName}` : `${varName}`, 
-                        quantidade: qtd, foto_url: fotoUrl, ativo: true 
+                        quantidade: qtd, foto_url: fotoUrl, ativo: true, secao: '' 
                     }]); 
                     if(error) throw error;
                 }
             }
         } else { 
-            const { error } = await supabaseClient.from('catalogo').insert([{ nome: nomeBase, categoria: categoria, subcategoria: subCatBase, quantidade: qtdGlobal, foto_url: fotoUrl, ativo: true }]); 
+            const { error } = await supabaseClient.from('catalogo').insert([{ nome: nomeBase, categoria: categoria, subcategoria: subCatBase, quantidade: qtdGlobal, foto_url: fotoUrl, ativo: true, secao: '' }]); 
             if(error) throw error;
         }
 
@@ -529,12 +529,12 @@ async function salvarEdicaoProduto() {
             for (let linha of linhasGrade) {
                 const varName = linha.querySelector('.edit-tamanho').value.trim(); const qtd = parseInt(linha.querySelector('.edit-qtd-tamanho').value) || 0;
                 if(varName) { 
-                    const { error } = await supabaseClient.from('catalogo').insert([{ nome: `${nomeBase} (${varName})`, categoria: categoria, subcategoria: subCatBase ? `${subCatBase} | ${varName}` : `${varName}`, quantidade: qtd, foto_url: oldFotoUrl, ativo: true }]); 
+                    const { error } = await supabaseClient.from('catalogo').insert([{ nome: `${nomeBase} (${varName})`, categoria: categoria, subcategoria: subCatBase ? `${subCatBase} | ${varName}` : `${varName}`, quantidade: qtd, foto_url: oldFotoUrl, ativo: true, secao: '' }]); 
                     if(error) throw error;
                 }
             }
         } else {
-            const { error } = await supabaseClient.from('catalogo').insert([{ nome: nomeBase, categoria: categoria, subcategoria: subCatBase, quantidade: qtdGlobal, foto_url: oldFotoUrl, ativo: true }]); 
+            const { error } = await supabaseClient.from('catalogo').insert([{ nome: nomeBase, categoria: categoria, subcategoria: subCatBase, quantidade: qtdGlobal, foto_url: oldFotoUrl, ativo: true, secao: '' }]); 
             if(error) throw error;
         }
 
