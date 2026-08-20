@@ -1,0 +1,24 @@
+{
+  "name": "Logística OPPO",
+  "short_name": "Logística",
+  "description": "Sistema de Logística e Pedidos",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#050a08",
+  "theme_color": "#050a08",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/b/b8/OPPO_Logo.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/b/b8/OPPO_Logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
