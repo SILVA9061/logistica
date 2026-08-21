@@ -818,8 +818,15 @@ async function carregarNotificacoes() {
     }); lucide.createIcons();
 }
 
-function abrirModalNotificacoes() { document.getElementById('modal-notificacoes').style.display = 'block'; }
-function fecharNotificacoesFora(e) { if(e.target.id === 'modal-notificacoes') { document.getElementById('modal-notificacoes').style.display = 'none'; } }
+function abrirModalNotificacoes() { 
+    document.getElementById('modal-notificacoes').classList.add('open'); 
+    document.getElementById('overlay-drawer-invisivel').style.display = 'block';
+}
+
+function fecharDrawerNotificacoes() { 
+    document.getElementById('modal-notificacoes').classList.remove('open'); 
+    document.getElementById('overlay-drawer-invisivel').style.display = 'none';
+}
 
 async function carregarPedidos(reset = true) {
     if (reset) {
