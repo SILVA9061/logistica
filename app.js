@@ -22,6 +22,11 @@ let chartLojas = null;
 let chartStatus = null;
 let chartMateriais = null;
 
+// Memórias do Dashboard de BI
+let memoriaRupturasBI = [];
+let memoriaPedidosBI = [];
+let memoriaLojasBI = [];
+
 document.getElementById('tela-pedidos').addEventListener('scroll', function() {
     if (this.scrollHeight - this.scrollTop - this.clientHeight < 100) { carregarPedidos(false); }
 });
@@ -69,6 +74,25 @@ function toggleSenha(inputId, iconeId) {
     if (input.type === 'password') { input.type = 'text'; icone.setAttribute('data-lucide', 'eye-off'); } 
     else { input.type = 'password'; icone.setAttribute('data-lucide', 'eye'); }
     lucide.createIcons();
+}
+
+function toggleNovaFilial(prefix) {
+    const sel = document.getElementById(prefix === 'new' ? 'select-filial-user' : 'edit-filial-user');
+    const inp = document.getElementById(prefix === 'new' ? 'input-nova-filial' : 'edit-nova-filial');
+    const btn = document.getElementById(prefix === 'new' ? 'btn-toggle-filial' : 'btn-toggle-edit-filial');
+    
+    if (sel.style.display === 'none') { 
+        sel.style.display = 'block'; 
+        inp.style.display = 'none'; 
+        inp.value = ''; 
+        btn.innerText = '+ Cadastrar Nova Empresa'; 
+        btn.style.color = 'var(--primary)'; 
+    } else { 
+        sel.style.display = 'none'; 
+        inp.style.display = 'block'; 
+        btn.innerText = 'Voltar para a lista'; 
+        btn.style.color = 'var(--cor-secundaria)'; 
+    }
 }
 
 let callbackConfirmacaoAtual = null;
@@ -156,7 +180,9 @@ function selecionarFiltroSupervisorCustom(id, nome) {
 
 async function carregarFiltroSupervisoresCustom() {
     const caixaOpts = document.getElementById('custom-options-sup'); if(!caixaOpts) return; 
-    const { data } = await supabaseClient.from('usuarios').select('id, nome').eq('cargo', 'Supervisor').order('nome');
+    let q = supabaseClient.from('usuarios').select('id, nome').eq('cargo', 'Supervisor').order('nome');
+    if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
+    const { data } = await q;
     
     let html = `<div class="custom-option ${filtroSupIdSelecionado === '' ? 'selecionado' : ''}" onclick="selecionarFiltroSupervisorCustom('', 'Todos os Supervisores')">
                     <i data-lucide="users" style="width:16px; height:16px;"></i> Todos os Supervisores 
@@ -196,6 +222,7 @@ async function carregarLojasSelect() {
 
     let q = supabaseClient.from('lojas').select('id, nome').order('nome'); 
     if (usuarioLogado.cargo === 'Supervisor') q = q.eq('supervisor_id', usuarioLogado.id);
+    if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
     const { data } = await q; 
     
     let html = `<div class="custom-option" onclick="selecionarLojaCustom('', 'Selecione a unidade...')">Selecione a unidade...</div>`; 
@@ -241,8 +268,24 @@ function selecionarMotivoCustom(valor, elemento) {
 // ==========================================
 // 3. NAVEGAÇÃO E LOGIN 
 // ==========================================
-function alternarTelaLogin(isCadastro) { document.getElementById('form-login').style.display = isCadastro ? 'none' : 'block'; document.getElementById('form-cadastro').style.display = isCadastro ? 'block' : 'none'; }
+function alternarTelaLogin(isCadastro) { 
+    document.getElementById('form-login').style.display = isCadastro ? 'none' : 'block'; 
+    document.getElementById('form-cadastro').style.display = isCadastro ? 'block' : 'none'; 
+    if (isCadastro) { carregarFiliaisCadastro(); }
+}
 window.onload = () => { const sessao = localStorage.getItem('usuarioLogado'); if (sessao) { usuarioLogado = JSON.parse(sessao); iniciarAplicativo(); } };
+
+async function carregarFiliaisCadastro() {
+    const select = document.getElementById('cad-filial');
+    try {
+        const { data, error } = await supabaseClient.from('filiais').select('id, nome_fantasia').order('nome_fantasia');
+        if (error) throw error;
+        
+        let html = '<option value="">Selecione sua Empresa/Filial *</option>';
+        if (data) { data.forEach(f => { html += `<option value="${f.id}">${f.nome_fantasia}</option>`; }); }
+        select.innerHTML = html;
+    } catch (e) { select.innerHTML = '<option value="">Erro ao carregar</option>'; }
+}
 
 async function fazerLogin() {
     const email = document.getElementById('login-email').value.trim(); const senha = document.getElementById('login-senha').value.trim();
@@ -251,8 +294,13 @@ async function fazerLogin() {
     if (!email || !senha) return mostrarAviso('Preencha e-mail e senha!', 'erro');
     setCarregamento('btn-login', true, 'Autenticando...');
     try {
-        const { data, error } = await supabaseClient.from('usuarios').select('*').eq('email', email).eq('senha', senha).single();
+        const { data, error } = await supabaseClient.from('usuarios').select('*, filiais(nome_fantasia)').eq('email', email).eq('senha', senha).single();
         if (error || !data) throw new Error();
+        
+        if (data) {
+            data.filial_nome = data.filiais ? data.filiais.nome_fantasia : 'Logística OPPO c/o Climbers';
+        }
+        
         usuarioLogado = data; localStorage.setItem('usuarioLogado', JSON.stringify(data));
         mostrarAviso(`Bem-vindo, ${data.nome}!`, 'sucesso'); iniciarAplicativo();
     } catch (erro) { 
@@ -261,12 +309,24 @@ async function fazerLogin() {
 }
 
 async function fazerCadastro() {
-    const nome = document.getElementById('cad-nome').value.trim(); const email = document.getElementById('cad-email').value.trim(); const senha = document.getElementById('cad-senha').value.trim();
-    if (!nome || !email || !senha) return mostrarAviso('Preencha todos os campos!', 'erro');
+    const nome = document.getElementById('cad-nome').value.trim(); 
+    const email = document.getElementById('cad-email').value.trim(); 
+    const senha = document.getElementById('cad-senha').value.trim();
+    const filial_id = document.getElementById('cad-filial').value || null;
+
+    if (!nome || !email || !senha || !filial_id) return mostrarAviso('Preencha todos os campos e selecione a empresa!', 'erro');
+    
     setCarregamento('btn-cadastrar', true, 'Criando...');
     try {
-        const { data, error } = await supabaseClient.from('usuarios').insert([{ nome, email, senha, cargo: 'Supervisor' }]).select().single();
-        if (error) throw error; usuarioLogado = data; localStorage.setItem('usuarioLogado', JSON.stringify(data)); iniciarAplicativo();
+        const { data, error } = await supabaseClient.from('usuarios')
+            .insert([{ nome, email, senha, cargo: 'Supervisor', filial_id: filial_id }])
+            .select('*, filiais(nome_fantasia)').single();
+            
+        if (error) throw error; 
+        if (data) { data.filial_nome = data.filiais ? data.filiais.nome_fantasia : 'Logística OPPO c/o Climbers'; }
+
+        usuarioLogado = data; localStorage.setItem('usuarioLogado', JSON.stringify(data)); 
+        iniciarAplicativo();
     } catch (erro) { mostrarAviso('Erro ao criar conta ou e-mail já existe.', 'erro'); } finally { setCarregamento('btn-cadastrar', false); }
 }
 
@@ -330,7 +390,7 @@ function mostrarTela(idTela) {
     if (idTela === 'tela-pedidos') carregarPedidos(true); 
     if (idTela === 'tela-fazer-pedido') { carregarLojasSelect(); carregarCatalogoPedido(); }
     if (idTela === 'tela-gerenciar-catalogo') carregarVitrineAdmin(); 
-    if (idTela === 'tela-gerenciar-usuarios') { carregarTabelaUsuarios(); carregarTabelaLojas(); carregarSupervisoresModal(); }
+    if (idTela === 'tela-gerenciar-usuarios') { carregarTabelaUsuarios(); carregarTabelaLojas(); }
     if (idTela === 'tela-auditoria') carregarAuditoria();
     if (idTela === 'tela-relatorios') carregarRelatorios();
 }
@@ -361,14 +421,13 @@ function abrirModalNovoProduto() {
     verificarEstoqueGlobal(); carregarCategoriasSelect(); document.getElementById('modal-novo-produto').style.display = 'flex'; lucide.createIcons();
 }
 
-function toggleNovaCategoria(prefix) {
-    const sel = document.getElementById(`${prefix}-categoria`); const inp = document.getElementById(`${prefix}-nova-categoria`); const btn = document.getElementById(`btn-toggle-${prefix === 'edit' ? 'edit-' : ''}categoria`);
-    if (sel.style.display === 'none') { sel.style.display = 'block'; inp.style.display = 'none'; inp.value = ''; btn.innerText = '+ Criar Nova Categoria'; btn.style.color = 'var(--primary)'; } 
-    else { sel.style.display = 'none'; inp.style.display = 'block'; btn.innerText = 'Voltar para lista'; btn.style.color = 'var(--cor-secundaria)'; }
-}
-
 async function carregarCategoriasSelect() {
-    try { const { data } = await supabaseClient.from('catalogo').select('categoria').eq('ativo', true); if (data) { const categorias = [...new Set(data.map(i => i.categoria).filter(Boolean))].sort(); ['input-categoria', 'edit-categoria'].forEach(selId => { const el = document.getElementById(selId); if (el) { el.innerHTML = '<option value="Geral">Geral</option>'; categorias.forEach(c => { if(c !== 'Geral') el.innerHTML += `<option value="${c}">${c}</option>`; }); } }); } } catch (e) {}
+    try { 
+        let q = supabaseClient.from('catalogo').select('categoria').eq('ativo', true);
+        if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
+        const { data } = await q;
+        if (data) { const categorias = [...new Set(data.map(i => i.categoria).filter(Boolean))].sort(); ['input-categoria', 'edit-categoria'].forEach(selId => { const el = document.getElementById(selId); if (el) { el.innerHTML = '<option value="Geral">Geral</option>'; categorias.forEach(c => { if(c !== 'Geral') el.innerHTML += `<option value="${c}">${c}</option>`; }); } }); } 
+    } catch (e) {}
 }
 
 function adicionarLinhaGrade(variacao = '', qtd = '0') {
@@ -392,7 +451,12 @@ function consertarLinkGoogleDrive(url) { if (!url) return ''; let id = ''; if (u
 
 async function carregarVitrineAdmin() {
     const vitrine = document.getElementById('vitrine-admin'); if(!vitrine) return; vitrine.innerHTML = '<div style="color: var(--cor-secundaria); padding: 20px;"><i data-lucide="loader" class="spinner"></i> Organizando prateleiras...</div>'; lucide.createIcons();
-    try { const { data, error } = await supabaseClient.from('catalogo').select('*').eq('ativo', true).order('categoria').order('nome'); if (error) throw error; memoriaCatalogo = data || []; renderizarCategoriasAdmin(); renderizarVitrine(); } catch (e) { vitrine.innerHTML = `<div style="color: #ff4d4d; padding: 20px;">Erro ao carregar catálogo: ${e.message || 'Desconhecido'}</div>`; }
+    try { 
+        let q = supabaseClient.from('catalogo').select('*').eq('ativo', true).order('categoria').order('nome'); 
+        if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
+        const { data, error } = await q;
+        if (error) throw error; memoriaCatalogo = data || []; renderizarCategoriasAdmin(); renderizarVitrine(); 
+    } catch (e) { vitrine.innerHTML = `<div style="color: #ff4d4d; padding: 20px;">Erro ao carregar catálogo: ${e.message || 'Desconhecido'}</div>`; }
 }
 
 function renderizarCategoriasAdmin() {
@@ -442,14 +506,15 @@ async function salvarProduto() {
         
         const linhasGrade = document.querySelectorAll('#container-grade-tamanhos > div');
         const inserts = [];
+        const fId = usuarioLogado.filial_id || null; // SAAS
 
         if (linhasGrade.length > 0) {
             for (let linha of linhasGrade) {
                 const varName = linha.querySelector('.input-tamanho').value.trim(); const qtd = parseInt(linha.querySelector('.input-qtd-tamanho').value) || 0;
-                if(varName) inserts.push({ nome: `${nomeBase} (${varName})`, categoria: categoria, subcategoria: subCatBase ? `${subCatBase} | ${varName}` : `${varName}`, quantidade: qtd, foto_url: fotoUrl, ativo: true, secao: '' });
+                if(varName) inserts.push({ nome: `${nomeBase} (${varName})`, categoria: categoria, subcategoria: subCatBase ? `${subCatBase} | ${varName}` : `${varName}`, quantidade: qtd, foto_url: fotoUrl, ativo: true, secao: '', filial_id: fId });
             }
         } else { 
-            inserts.push({ nome: nomeBase, categoria: categoria, subcategoria: subCatBase, quantidade: qtdGlobal, foto_url: fotoUrl, ativo: true, secao: '' }); 
+            inserts.push({ nome: nomeBase, categoria: categoria, subcategoria: subCatBase, quantidade: qtdGlobal, foto_url: fotoUrl, ativo: true, secao: '', filial_id: fId }); 
         }
 
         const { error } = await supabaseClient.from('catalogo').insert(inserts);
@@ -483,13 +548,14 @@ async function salvarEdicaoProduto() {
         
         const linhasGrade = document.querySelectorAll('#container-grade-edit > div');
         const inserts = [];
+        const fId = usuarioLogado.filial_id || null; // SAAS
 
         if (linhasGrade.length > 0) {
             for (let linha of linhasGrade) {
                 const varName = linha.querySelector('.edit-tamanho').value.trim(); const qtd = parseInt(linha.querySelector('.edit-qtd-tamanho').value) || 0;
-                if(varName) inserts.push({ nome: `${nomeBase} (${varName})`, categoria: categoria, subcategoria: subCatBase ? `${subCatBase} | ${varName}` : `${varName}`, quantidade: qtd, foto_url: oldFotoUrl, ativo: true, secao: '' });
+                if(varName) inserts.push({ nome: `${nomeBase} (${varName})`, categoria: categoria, subcategoria: subCatBase ? `${subCatBase} | ${varName}` : `${varName}`, quantidade: qtd, foto_url: oldFotoUrl, ativo: true, secao: '', filial_id: fId });
             }
-        } else { inserts.push({ nome: nomeBase, categoria: categoria, subcategoria: subCatBase, quantidade: qtdGlobal, foto_url: oldFotoUrl, ativo: true, secao: '' }); }
+        } else { inserts.push({ nome: nomeBase, categoria: categoria, subcategoria: subCatBase, quantidade: qtdGlobal, foto_url: oldFotoUrl, ativo: true, secao: '', filial_id: fId }); }
 
         const { error } = await supabaseClient.from('catalogo').insert(inserts);
         if(error) throw error;
@@ -510,7 +576,10 @@ async function excluirProdutoGrupo(idsArrStr, btn) {
 // 5. LOJAS E USUÁRIOS
 // ==========================================
 async function carregarTabelaLojas() {
-    const tbody = document.getElementById('tabela-lojas-admin'); if(!tbody) return; let q = supabaseClient.from('lojas').select('*, usuarios(nome)').order('nome'); if (usuarioLogado.cargo === 'Supervisor') q = q.eq('supervisor_id', usuarioLogado.id); 
+    const tbody = document.getElementById('tabela-lojas-admin'); if(!tbody) return; 
+    let q = supabaseClient.from('lojas').select('*, usuarios(nome)').order('nome'); 
+    if (usuarioLogado.cargo === 'Supervisor') q = q.eq('supervisor_id', usuarioLogado.id); 
+    if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
     const { data } = await q; tbody.innerHTML = '';
     
     if (!data || data.length === 0) {
@@ -519,10 +588,14 @@ async function carregarTabelaLojas() {
     }
     
     data.forEach(loja => {
-        const promotor = loja.promotor_nome ? ` | Prom: ${loja.promotor_nome}` : ''; const lojaStr = JSON.stringify(loja).replace(/"/g, '&quot;');
+        const promotor = loja.promotor_nome ? ` | Prom: ${loja.promotor_nome}` : ''; 
+        const cpfInfo = loja.cpf ? `<br><span style="font-size:11px; color:var(--cor-secundaria)"><i data-lucide="credit-card" class="lucide-sm" style="display:inline-block; vertical-align:middle; width:12px; margin-right:3px;"></i>CPF: ${loja.cpf}</span>` : '';
+        const lojaStr = JSON.stringify(loja).replace(/"/g, '&quot;');
+        
         let botoesAcao = `<button onclick="abrirModalEditarLoja('${lojaStr}')" style="background:transparent; border:none; color:var(--primary); cursor:pointer;" title="Editar Loja"><i data-lucide="edit" class="lucide-sm"></i></button>`;
         if (usuarioLogado.cargo === 'Diretor' || usuarioLogado.cargo === 'Logistica' || usuarioLogado.cargo === 'Master') botoesAcao += `<button onclick="excluirLoja(${loja.id}, this)" style="background:transparent; border:none; color:#ff4d4d; cursor:pointer; margin-left:10px;" title="Excluir Loja"><i data-lucide="trash-2" class="lucide-sm"></i></button>`;
-        tbody.innerHTML += `<tr><td><strong>${loja.nome}</strong><br><span style="font-size:11px; color:var(--cor-secundaria)">Sup: ${loja.usuarios?.nome || 'Você'}${promotor}</span></td><td>${botoesAcao}</td></tr>`;
+        
+        tbody.innerHTML += `<tr><td><strong>${loja.nome}</strong>${cpfInfo}<br><span style="font-size:11px; color:var(--cor-secundaria)">Sup: ${loja.usuarios?.nome || 'Você'}${promotor}</span></td><td>${botoesAcao}</td></tr>`;
     }); lucide.createIcons();
 }
 
@@ -535,7 +608,30 @@ async function excluirLoja(id, btn) {
 }
 
 function abrirModalNovaLoja() {
-    document.getElementById('loja-nome').value = ''; document.getElementById('loja-promotor').value = ''; document.getElementById('loja-contato').value = ''; document.getElementById('loja-cep').value = ''; document.getElementById('loja-rua').value = ''; document.getElementById('loja-bairro').value = ''; document.getElementById('loja-cidade').value = ''; document.getElementById('loja-estado').value = '';
+    document.getElementById('loja-nome').value = ''; 
+    document.getElementById('loja-promotor').value = ''; 
+    document.getElementById('loja-contato').value = ''; 
+    document.getElementById('loja-cpf').value = '';
+    document.getElementById('loja-cep').value = ''; 
+    document.getElementById('loja-rua').value = ''; 
+    document.getElementById('loja-bairro').value = ''; 
+    document.getElementById('loja-cidade').value = ''; 
+    document.getElementById('loja-estado').value = '';
+    
+    const selectSup = document.getElementById('loja-supervisor');
+    selectSup.innerHTML = '<option value="">Carregando...</option>';
+    
+    let q = supabaseClient.from('usuarios').select('id, nome').eq('cargo', 'Supervisor').order('nome');
+    if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
+    
+    q.then(({data}) => {
+        if(data) {
+            let html = '<option value="">Selecione o Supervisor...</option>';
+            data.forEach(s => { html += `<option value="${s.id}">${s.nome}</option>`; });
+            selectSup.innerHTML = html;
+        }
+    });
+
     if (usuarioLogado.cargo === 'Supervisor') { document.getElementById('container-supervisor-loja').style.display = 'none'; } else { document.getElementById('container-supervisor-loja').style.display = 'block'; }
     document.getElementById('modal-nova-loja').style.display = 'flex';
 }
@@ -543,7 +639,21 @@ function abrirModalNovaLoja() {
 async function salvarLoja() {
     let supervisor_id = document.getElementById('loja-supervisor').value;
     if (usuarioLogado.cargo === 'Supervisor') supervisor_id = usuarioLogado.id;
-    const dados = { nome: document.getElementById('loja-nome').value.trim(), supervisor_id: supervisor_id, promotor_nome: document.getElementById('loja-promotor').value.trim(), promotor_contato: document.getElementById('loja-contato').value.trim(), cep: document.getElementById('loja-cep').value.trim(), rua: document.getElementById('loja-rua').value.trim(), bairro: document.getElementById('loja-bairro').value.trim(), cidade: document.getElementById('loja-cidade').value.trim(), estado: document.getElementById('loja-estado').value.trim() };
+    const fId = usuarioLogado.filial_id || null; // SAAS
+    
+    const dados = { 
+        nome: document.getElementById('loja-nome').value.trim(), 
+        supervisor_id: supervisor_id, 
+        promotor_nome: document.getElementById('loja-promotor').value.trim(), 
+        promotor_contato: document.getElementById('loja-contato').value.trim(), 
+        cpf: document.getElementById('loja-cpf').value.trim(),
+        cep: document.getElementById('loja-cep').value.trim(), 
+        rua: document.getElementById('loja-rua').value.trim(), 
+        bairro: document.getElementById('loja-bairro').value.trim(), 
+        cidade: document.getElementById('loja-cidade').value.trim(), 
+        estado: document.getElementById('loja-estado').value.trim(),
+        filial_id: fId
+    };
     if (!dados.nome || !dados.supervisor_id) return mostrarAviso('Loja e Supervisor obrigatórios!', 'erro');
     setCarregamento('btn-salvar-loja', true, 'Salvando...');
     try { const { error } = await supabaseClient.from('lojas').insert([dados]); if (error) throw error; mostrarAviso('Loja criada!', 'sucesso'); document.getElementById('modal-nova-loja').style.display = 'none'; carregarTabelaLojas(); } catch (e) { mostrarAviso('Erro ao criar loja.', 'erro'); } finally { setCarregamento('btn-salvar-loja', false); }
@@ -551,22 +661,64 @@ async function salvarLoja() {
 
 function abrirModalEditarLoja(lojaStr) {
     const loja = JSON.parse(lojaStr);
-    document.getElementById('edit-id-loja').value = loja.id; document.getElementById('edit-loja-nome').value = loja.nome; document.getElementById('edit-loja-promotor').value = loja.promotor_nome || ''; document.getElementById('edit-loja-contato').value = loja.promotor_contato || ''; document.getElementById('edit-loja-cep').value = loja.cep || ''; document.getElementById('edit-loja-rua').value = loja.rua || ''; document.getElementById('edit-loja-bairro').value = loja.bairro || ''; document.getElementById('edit-loja-cidade').value = loja.cidade || ''; document.getElementById('edit-loja-estado').value = loja.estado || '';
-    if (usuarioLogado.cargo === 'Diretor' || usuarioLogado.cargo === 'Logistica' || usuarioLogado.cargo === 'Master') { document.getElementById('container-edit-supervisor-loja').style.display = 'block'; document.getElementById('edit-loja-supervisor').value = loja.supervisor_id; } else { document.getElementById('container-edit-supervisor-loja').style.display = 'none'; }
+    document.getElementById('edit-id-loja').value = loja.id; 
+    document.getElementById('edit-loja-nome').value = loja.nome; 
+    document.getElementById('edit-loja-promotor').value = loja.promotor_nome || ''; 
+    document.getElementById('edit-loja-contato').value = loja.promotor_contato || ''; 
+    document.getElementById('edit-loja-cpf').value = loja.cpf || ''; 
+    document.getElementById('edit-loja-cep').value = loja.cep || ''; 
+    document.getElementById('edit-loja-rua').value = loja.rua || ''; 
+    document.getElementById('edit-loja-bairro').value = loja.bairro || ''; 
+    document.getElementById('edit-loja-cidade').value = loja.cidade || ''; 
+    document.getElementById('edit-loja-estado').value = loja.estado || '';
+    
+    const selectSup = document.getElementById('edit-loja-supervisor');
+    selectSup.innerHTML = '<option value="">Carregando...</option>';
+    
+    let q = supabaseClient.from('usuarios').select('id, nome').eq('cargo', 'Supervisor').order('nome');
+    if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
+    
+    q.then(({data}) => {
+        if(data) {
+            let html = '<option value="">Selecione o Supervisor...</option>';
+            data.forEach(s => { html += `<option value="${s.id}" ${s.id === loja.supervisor_id ? 'selected' : ''}>${s.nome}</option>`; });
+            selectSup.innerHTML = html;
+        }
+    });
+
+    if (usuarioLogado.cargo === 'Diretor' || usuarioLogado.cargo === 'Logistica' || usuarioLogado.cargo === 'Master') { document.getElementById('container-edit-supervisor-loja').style.display = 'block'; } else { document.getElementById('container-edit-supervisor-loja').style.display = 'none'; }
     document.getElementById('modal-editar-loja').style.display = 'flex';
 }
 
 async function salvarEdicaoLoja() {
     const id = document.getElementById('edit-id-loja').value; let supervisor_id = document.getElementById('edit-loja-supervisor').value;
     if (usuarioLogado.cargo === 'Supervisor') supervisor_id = usuarioLogado.id;
-    const dados = { nome: document.getElementById('edit-loja-nome').value.trim(), supervisor_id: supervisor_id, promotor_nome: document.getElementById('edit-loja-promotor').value.trim(), promotor_contato: document.getElementById('edit-loja-contato').value.trim(), cep: document.getElementById('edit-loja-cep').value.trim(), rua: document.getElementById('edit-loja-rua').value.trim(), bairro: document.getElementById('edit-loja-bairro').value.trim(), cidade: document.getElementById('edit-loja-cidade').value.trim(), estado: document.getElementById('edit-loja-estado').value.trim() };
+    const fId = usuarioLogado.filial_id || null; // SAAS
+    
+    const dados = { 
+        nome: document.getElementById('edit-loja-nome').value.trim(), 
+        supervisor_id: supervisor_id, 
+        promotor_nome: document.getElementById('edit-loja-promotor').value.trim(), 
+        promotor_contato: document.getElementById('edit-loja-contato').value.trim(), 
+        cpf: document.getElementById('edit-loja-cpf').value.trim(),
+        cep: document.getElementById('edit-loja-cep').value.trim(), 
+        rua: document.getElementById('edit-loja-rua').value.trim(), 
+        bairro: document.getElementById('edit-loja-bairro').value.trim(), 
+        cidade: document.getElementById('edit-loja-cidade').value.trim(), 
+        estado: document.getElementById('edit-loja-estado').value.trim(),
+        filial_id: fId
+    };
     setCarregamento('btn-salvar-edicao-loja', true, 'Salvando...');
     try { const { error } = await supabaseClient.from('lojas').update(dados).eq('id', id); if (error) throw error; mostrarAviso('Atualizado com sucesso!', 'sucesso'); document.getElementById('modal-editar-loja').style.display = 'none'; carregarTabelaLojas(); } catch(e) { mostrarAviso('Erro ao editar loja.', 'erro'); } finally { setCarregamento('btn-salvar-edicao-loja', false); }
 }
 
 async function carregarTabelaUsuarios() {
     const tbody = document.getElementById('tabela-usuarios-admin'); if(!tbody) return;
-    const { data } = await supabaseClient.from('usuarios').select('*').order('nome'); tbody.innerHTML = ''; 
+    
+    let q = supabaseClient.from('usuarios').select('*, filiais(nome_fantasia)').order('nome'); 
+    if (usuarioLogado.filial_id && usuarioLogado.cargo !== 'Master') q = q.eq('filial_id', usuarioLogado.filial_id);
+    
+    const { data } = await q; tbody.innerHTML = ''; 
     
     if (!data || data.length === 0) {
         tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state"><i data-lucide="users"></i><p>Nenhum usuário ativo.</p></div></td></tr>`;
@@ -588,7 +740,8 @@ async function carregarTabelaUsuarios() {
         if (!podeEditar) { botoesAcao = '<span style="font-size:11px; color:var(--cor-secundaria); font-weight:bold;">Acesso Restrito</span>'; } 
         else { botoesAcao = `<button onclick="abrirModalEditarUsuario('${userStr}')" style="background:transparent; border:none; color:var(--primary); cursor:pointer;" title="Editar Usuário"><i data-lucide="edit" class="lucide-sm"></i></button><button onclick="excluirUsuario(${u.id}, this)" style="background:transparent; border:none; color:#ff4d4d; cursor:pointer; margin-left:10px;" title="Excluir Usuário"><i data-lucide="trash-2" class="lucide-sm"></i></button>`; }
         
-        tbody.innerHTML += `<tr><td><strong>${u.nome}</strong></td><td>${u.cargo}</td><td>${botoesAcao}</td></tr>`;
+        const nomeEmpresa = u.filiais ? `<br><span style="font-size:11px; color:var(--primary);"><i data-lucide="building" style="width:10px; height:10px; display:inline-block; margin-right:3px;"></i>${u.filiais.nome_fantasia}</span>` : '';
+        tbody.innerHTML += `<tr><td><strong>${u.nome}</strong>${nomeEmpresa}</td><td>${u.cargo}</td><td>${botoesAcao}</td></tr>`;
     }); lucide.createIcons();
 }
 
@@ -601,16 +754,44 @@ async function excluirUsuario(id, btn) {
     });
 }
 
-function abrirModalNovoUsuario() {
+async function carregarFiliaisSelect() {
+    const selects = [document.getElementById('select-filial-user'), document.getElementById('edit-filial-user')];
+    try {
+        const { data, error } = await supabaseClient.from('filiais').select('id, nome_fantasia').order('nome_fantasia');
+        if (error) throw error;
+        
+        let html = '<option value="">Sem vínculo (Desvinculado)</option>';
+        if (data) {
+            data.forEach(f => {
+                html += `<option value="${f.id}">${f.nome_fantasia}</option>`;
+            });
+        }
+        
+        selects.forEach(select => {
+            if (select) select.innerHTML = html;
+        });
+    } catch (e) {
+        console.error("Erro ao carregar filiais:", e);
+    }
+}
+
+async function abrirModalNovoUsuario() {
     document.getElementById('input-nome-user').value = ''; document.getElementById('input-email-user').value = ''; document.getElementById('input-senha-user').value = '';
     const selectCargo = document.getElementById('select-cargo-user'); selectCargo.innerHTML = '';
     if (usuarioLogado.cargo === 'Master') { selectCargo.innerHTML = `<option value="Diretor">Diretor</option><option value="Logistica">Logística</option><option value="Supervisor">Supervisor</option><option value="Master">Master</option>`; } 
     else if (usuarioLogado.cargo === 'Diretor') { selectCargo.innerHTML = `<option value="Logistica">Logística</option><option value="Supervisor">Supervisor</option>`; } 
     else if (usuarioLogado.cargo === 'Logistica') { selectCargo.innerHTML = `<option value="Supervisor">Supervisor</option>`; }
+    
+    document.getElementById('select-filial-user').style.display = 'block';
+    document.getElementById('input-nova-filial').style.display = 'none';
+    document.getElementById('btn-toggle-filial').innerText = '+ Cadastrar Nova Empresa';
+    document.getElementById('btn-toggle-filial').style.color = 'var(--primary)';
+    
+    await carregarFiliaisSelect();
     document.getElementById('modal-novo-usuario').style.display = 'flex';
 }
 
-function abrirModalEditarUsuario(userStr) {
+async function abrirModalEditarUsuario(userStr) {
     const user = JSON.parse(userStr); document.getElementById('edit-id-user').value = user.id; document.getElementById('edit-nome-user').value = user.nome; document.getElementById('edit-email-user').value = user.email; document.getElementById('edit-senha-user').value = user.senha; 
     const cargoSelect = document.getElementById('edit-cargo-user'); cargoSelect.innerHTML = '';
     
@@ -623,21 +804,79 @@ function abrirModalEditarUsuario(userStr) {
     
     const isLogadoAdmin = (usuarioLogado.cargo && usuarioLogado.cargo.toLowerCase().includes('diretor')) || usuarioLogado.cargo === 'Master';
     if (!isLogadoAdmin) { cargoSelect.disabled = true; cargoSelect.style.opacity = '0.5'; cargoSelect.title = "Apenas diretores/masters podem alterar cargos"; } else { cargoSelect.disabled = false; cargoSelect.style.opacity = '1'; cargoSelect.title = ""; }
+    
+    document.getElementById('edit-filial-user').style.display = 'block';
+    document.getElementById('edit-nova-filial').style.display = 'none';
+    document.getElementById('btn-toggle-edit-filial').innerText = '+ Cadastrar Nova Empresa';
+    document.getElementById('btn-toggle-edit-filial').style.color = 'var(--primary)';
+
+    await carregarFiliaisSelect();
+    document.getElementById('edit-filial-user').value = user.filial_id || '';
+    
     document.getElementById('modal-editar-usuario').style.display = 'flex';
 }
 
 async function salvarEdicaoUsuario() {
-    const id = document.getElementById('edit-id-user').value; const nome = document.getElementById('edit-nome-user').value.trim(); const email = document.getElementById('edit-email-user').value.trim(); const senha = document.getElementById('edit-senha-user').value.trim(); const cargo = document.getElementById('edit-cargo-user').value;
+    const id = document.getElementById('edit-id-user').value; 
+    const nome = document.getElementById('edit-nome-user').value.trim(); 
+    const email = document.getElementById('edit-email-user').value.trim(); 
+    const senha = document.getElementById('edit-senha-user').value.trim(); 
+    const cargo = document.getElementById('edit-cargo-user').value;
+    
+    let filial_id = document.getElementById('edit-filial-user').value || null;
+    const inputNovaFilialEdit = document.getElementById('edit-nova-filial');
+
     setCarregamento('btn-salvar-edicao-usuario', true, 'Salvando...');
-    try { const { error } = await supabaseClient.from('usuarios').update({ nome, email, senha, cargo }).eq('id', id); if(error) throw error; mostrarAviso('Atualizado!', 'sucesso'); document.getElementById('modal-editar-usuario').style.display = 'none'; carregarTabelaUsuarios(); } 
-    catch (e) { mostrarAviso('Erro ao editar usuário.', 'erro'); } finally { setCarregamento('btn-salvar-edicao-usuario', false); }
+    try { 
+        if (inputNovaFilialEdit.style.display === 'block' && inputNovaFilialEdit.value.trim() !== '') {
+            const { data: novaEmp, error: errEmp } = await supabaseClient.from('filiais').insert([{ nome_fantasia: inputNovaFilialEdit.value.trim() }]).select().single();
+            if (errEmp) throw errEmp;
+            filial_id = novaEmp.id; 
+        }
+
+        const { error } = await supabaseClient.from('usuarios').update({ nome, email, senha, cargo, filial_id }).eq('id', id); 
+        if(error) throw error; 
+        
+        mostrarAviso('Atualizado!', 'sucesso'); 
+        document.getElementById('modal-editar-usuario').style.display = 'none'; 
+        carregarTabelaUsuarios(); 
+    } catch (e) { 
+        mostrarAviso('Erro ao editar usuário ou empresa.', 'erro'); 
+        console.error(e);
+    } finally { 
+        setCarregamento('btn-salvar-edicao-usuario', false); 
+    }
 }
 
 async function salvarUsuario() {
-    const nome = document.getElementById('input-nome-user').value.trim(); const email = document.getElementById('input-email-user').value.trim(); const senha = document.getElementById('input-senha-user').value.trim(); const cargo = document.getElementById('select-cargo-user').value;
-    setCarregamento('btn-salvar-usuario', true, 'Cadastrando...');
-    try { const { error } = await supabaseClient.from('usuarios').insert([{ nome, email, senha, cargo }]); if(error) throw error; mostrarAviso('Criado!', 'sucesso'); document.getElementById('modal-novo-usuario').style.display = 'none'; carregarTabelaUsuarios(); } 
-    catch (e) { mostrarAviso('Erro ao criar usuário.', 'erro'); } finally { setCarregamento('btn-salvar-usuario', false); }
+    const nome = document.getElementById('input-nome-user').value.trim(); 
+    const email = document.getElementById('input-email-user').value.trim(); 
+    const senha = document.getElementById('input-senha-user').value.trim(); 
+    const cargo = document.getElementById('select-cargo-user').value;
+    
+    let filial_id = document.getElementById('select-filial-user').value || null;
+    const inputNovaFilial = document.getElementById('input-nova-filial');
+
+    setCarregamento('btn-salvar-usuario', true, 'Processando...');
+    try { 
+        if (inputNovaFilial.style.display === 'block' && inputNovaFilial.value.trim() !== '') {
+            const { data: novaEmp, error: errEmp } = await supabaseClient.from('filiais').insert([{ nome_fantasia: inputNovaFilial.value.trim() }]).select().single();
+            if (errEmp) throw errEmp;
+            filial_id = novaEmp.id;
+        }
+
+        const { error } = await supabaseClient.from('usuarios').insert([{ nome, email, senha, cargo, filial_id }]); 
+        if(error) throw error; 
+        
+        mostrarAviso('Criado!', 'sucesso'); 
+        document.getElementById('modal-novo-usuario').style.display = 'none'; 
+        carregarTabelaUsuarios(); 
+    } catch (e) { 
+        mostrarAviso('Erro ao criar usuário ou empresa.', 'erro'); 
+        console.error(e);
+    } finally { 
+        setCarregamento('btn-salvar-usuario', false); 
+    }
 }
 
 // ==========================================
@@ -649,7 +888,12 @@ let categoriaAtivaPedido = 'Todos';
 async function carregarCatalogoPedido() {
     const vitrine = document.getElementById('vitrine-pedido'); if(!vitrine) return;
     vitrine.innerHTML = '<div style="color: var(--cor-secundaria); padding: 20px;"><i data-lucide="loader" class="spinner"></i> Carregando produtos...</div>'; lucide.createIcons();
-    try { const { data, error } = await supabaseClient.from('catalogo').select('*').eq('ativo', true).order('categoria').order('nome'); if (error) throw error; memoriaCatalogoPedido = data || []; memoriaCatalogoPedido.forEach(item => item.qtdSelecionada = 0); renderizarCategoriasPedido(); renderizarVitrinePedido(); } catch (e) { vitrine.innerHTML = `<div style="color: #ff4d4d; padding: 20px;">Erro ao carregar catálogo.</div>`; }
+    try { 
+        let q = supabaseClient.from('catalogo').select('*').eq('ativo', true).order('categoria').order('nome'); 
+        if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
+        const { data, error } = await q; 
+        if (error) throw error; memoriaCatalogoPedido = data || []; memoriaCatalogoPedido.forEach(item => item.qtdSelecionada = 0); renderizarCategoriasPedido(); renderizarVitrinePedido(); 
+    } catch (e) { vitrine.innerHTML = `<div style="color: #ff4d4d; padding: 20px;">Erro ao carregar catálogo.</div>`; }
 }
 
 function renderizarCategoriasPedido() {
@@ -740,14 +984,15 @@ async function salvarSolicitacao() {
             const uploadPromises = arquivosBancada.map((file, i) => fazerUploadDrive(file, `bancada_${i+1}`)); urlsBancada = await Promise.all(uploadPromises);
         } catch (errDrive) { console.error("Erro Drive:", errDrive); mostrarAviso('Falha no upload das fotos. Enviando sem imagens.', 'erro'); }
         
-        const { error: erroInsert } = await supabaseClient.from('pedidos').insert([{ loja_id: lojaId, detalhes, foto_url: urlsBancada.join(','), status: 'Pendente' }]); 
+        const fId = usuarioLogado.filial_id || null; // SAAS
+        const { error: erroInsert } = await supabaseClient.from('pedidos').insert([{ loja_id: lojaId, detalhes, foto_url: urlsBancada.join(','), status: 'Pendente', filial_id: fId }]); 
         if (erroInsert) throw erroInsert;
         
         const promessasBD = [];
         atualizacoesEstoque.forEach(item => {
             promessasBD.push(supabaseClient.from('catalogo').update({ quantidade: item.quantidade }).eq('id', item.id));
             try {
-                promessasBD.push(supabaseClient.from('logs_estoque').insert([{ material: item.nome, quantidade_movimentada: -item.baixado, responsavel: usuarioLogado.nome, motivo: 'Solicitação de Pedido' }]));
+                promessasBD.push(supabaseClient.from('logs_estoque').insert([{ material: item.nome, quantidade_movimentada: -item.baixado, responsavel: usuarioLogado.nome, motivo: 'Solicitação de Pedido', filial_id: fId }]));
             } catch (errLog) {}
         });
         await Promise.allSettled(promessasBD);
@@ -786,6 +1031,8 @@ async function carregarNotificacoes() {
     } else {
         q = q.in('status', ['Pendente', 'Aguardando Reversa']);
     }
+    
+    if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
 
     const { data } = await q;
     const lista = document.getElementById('lista-notificacoes-corpo');
@@ -838,6 +1085,8 @@ async function carregarPedidos(reset = true) {
         if (usuarioLogado.cargo === 'Supervisor') qStats = qStats.eq('lojas.supervisor_id', usuarioLogado.id);
         else if (filtroSupIdSelecionado) qStats = qStats.eq('lojas.supervisor_id', filtroSupIdSelecionado);
         
+        if (usuarioLogado.filial_id) qStats = qStats.eq('filial_id', usuarioLogado.filial_id);
+        
         const { data: stats } = await qStats;
         if(stats) {
             let pendentes = 0, enviados = 0, reversas = 0, entregues = 0, alertas = 0;
@@ -846,7 +1095,7 @@ async function carregarPedidos(reset = true) {
                 if (p.status === 'Enviado') enviados++; 
                 if (p.status === 'Aguardando Reversa') reversas++; 
                 if (p.status === 'Entregue' || p.status === 'Reversa Concluída') entregues++; 
-                if (p.detalhes.includes('ESTOQUE')) alertas++; 
+                if (p.detalhes.includes('ESTOQUE') || p.detalhes.includes('PARCIAL')) alertas++; 
             });
             document.getElementById('dash-pendentes').innerText = pendentes; 
             document.getElementById('dash-enviados').innerText = enviados; 
@@ -874,7 +1123,7 @@ async function carregarPedidos(reset = true) {
     else if (filtroSupIdSelecionado) q = q.eq('lojas.supervisor_id', filtroSupIdSelecionado);
 
     if (filtroCardAtivo) { 
-        if (filtroCardAtivo === 'Alerta') q = q.like('detalhes', '%ESTOQUE%'); 
+        if (filtroCardAtivo === 'Alerta') q = q.or('detalhes.ilike.%ESTOQUE%,detalhes.ilike.%PARCIAL%'); 
         else if (filtroCardAtivo === 'Entregue') q = q.in('status', ['Entregue', 'Reversa Concluída']);
         else if (filtroCardAtivo === 'Reversa') q = q.eq('status', 'Aguardando Reversa');
         else q = q.eq('status', filtroCardAtivo); 
@@ -883,6 +1132,8 @@ async function carregarPedidos(reset = true) {
         if (abaAtualPedidos === 'ativos') q = q.in('status', ['Pendente', 'Enviado', 'Aguardando Reversa']); 
         else q = q.in('status', ['Entregue', 'Reversa Concluída', 'Reprovado']); 
     }
+
+    if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
 
     q = q.order('created_at', { ascending: false }).range(paginaAtualPedidos * itensPorPagina, (paginaAtualPedidos + 1) * itensPorPagina - 1);
     const { data } = await q;
@@ -1027,6 +1278,7 @@ function imprimirRomaneio() {
 
 function prepararImpressaoEtiqueta(pedido) {
     const end = pedido.lojas;
+    document.getElementById('etiqueta-nome-empresa').innerText = (usuarioLogado && usuarioLogado.filial_nome) ? usuarioLogado.filial_nome : 'Logística OPPO c/o Climbers';
     document.getElementById('etiqueta-loja').innerText = end ? end.nome : 'Loja Desconhecida';
     document.getElementById('etiqueta-endereco').innerText = end ? `${end.rua}, ${end.bairro} - ${end.cidade}/${end.estado}` : 'Endereço não cadastrado';
     document.getElementById('etiqueta-cep').innerText = end ? `CEP: ${end.cep}` : 'CEP: N/A';
@@ -1038,6 +1290,15 @@ function prepararImpressaoEtiqueta(pedido) {
     document.body.classList.add('modo-etiqueta');
     window.print();
     document.body.classList.remove('modo-etiqueta');
+}
+
+function verificarMotivoRuptura(input, index) {
+    const container = document.getElementById(`motivo-ruptura-container-${index}`);
+    const original = parseInt(input.getAttribute('data-original'));
+    const atual = parseInt(input.value) || 0;
+    
+    if (atual < original) { container.style.display = 'block'; } 
+    else { container.style.display = 'none'; }
 }
 
 function abrirModalDespacho(id) {
@@ -1054,8 +1315,23 @@ function abrirModalDespacho(id) {
         const match = itemStr.match(/^(\d+)x\s+(.+)$/);
         if (match) {
             const qtdPedida = parseInt(match[1]); const nomeItem = match[2];
-            listaContainer.innerHTML += `<div class="linha-conferencia"><span style="flex: 2;"><strong>${nomeItem}</strong><br><small style="color: var(--cor-secundaria);">Pedido: ${qtdPedida} un.</small></span><div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 11px; color: var(--cor-secundaria); flex: none;">Enviando:</span><input type="number" class="input-conferencia" id="conf-qtd-${index}" value="${qtdPedida}" min="0" max="${qtdPedida}" data-nome="${nomeItem}" data-original="${qtdPedida}"></div></div>`;
-        } else { listaContainer.innerHTML += `<div class="linha-conferencia"><span style="flex: 2;"><strong>${itemStr}</strong></span></div>`; }
+            listaContainer.innerHTML += `
+                <div class="linha-conferencia-container" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="flex: 2;"><strong>${nomeItem}</strong><br><small style="color: var(--cor-secundaria);">Pedido: ${qtdPedida} un.</small></span>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 11px; color: var(--cor-secundaria); flex: none;">Enviando:</span>
+                            <input type="number" class="input-conferencia" id="conf-qtd-${index}" value="${qtdPedida}" min="0" max="${qtdPedida}" data-nome="${nomeItem}" data-original="${qtdPedida}" oninput="verificarMotivoRuptura(this, ${index})">
+                        </div>
+                    </div>
+                    <div id="motivo-ruptura-container-${index}" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.1);">
+                        <label style="font-size: 11px; color: #ff4d4d; margin-bottom: 4px; display: block;">Motivo do envio parcial/falta (Opcional):</label>
+                        <input type="text" id="motivo-ruptura-${index}" class="input-neon" placeholder="Ex: Item avariado, erro de estoque..." style="margin-bottom: 0; padding: 8px; font-size: 12px; border-color: rgba(255,77,77,0.4);">
+                    </div>
+                </div>`;
+        } else { 
+            listaContainer.innerHTML += `<div class="linha-conferencia-container" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px; border-radius: 8px; margin-bottom: 8px;"><span style="flex: 2;"><strong>${itemStr}</strong></span></div>`; 
+        }
     });
     document.getElementById('modal-despacho').style.display = 'flex'; lucide.createIcons();
 }
@@ -1065,21 +1341,43 @@ async function confirmarDespacho() {
     if (!pedidoOriginal) return;
     setCarregamento('btn-confirma-despacho', true, 'Aferindo Estoque...');
     try {
-        let houveRuptura = false; let novoDetalhes = []; const inputs = document.querySelectorAll('.input-conferencia');
+        let houveRuptura = false; let novoDetalhes = []; 
+        const containers = document.querySelectorAll('#lista-conferencia .linha-conferencia-container');
         const promessasBD = [];
-        for (let input of inputs) {
-            const nomeItem = input.getAttribute('data-nome'); const qtdOriginal = parseInt(input.getAttribute('data-original')); const qtdEnviada = parseInt(input.value) || 0;
+        const fId = usuarioLogado.filial_id || null; // SAAS
+        
+        for (let i = 0; i < containers.length; i++) {
+            const input = containers[i].querySelector('.input-conferencia');
+            if (!input) { novoDetalhes.push(containers[i].innerText.trim()); continue; }
+            
+            const nomeItem = input.getAttribute('data-nome'); 
+            const qtdOriginal = parseInt(input.getAttribute('data-original')); 
+            const qtdEnviada = parseInt(input.value) || 0;
+            
             if (qtdEnviada < qtdOriginal) {
-                houveRuptura = true; const diferenca = qtdOriginal - qtdEnviada;
+                houveRuptura = true; 
+                const diferenca = qtdOriginal - qtdEnviada;
+                
+                const motivoInput = containers[i].querySelector(`input[id^="motivo-ruptura-"]`);
+                const motivoTexto = (motivoInput && motivoInput.value.trim() !== '') ? ` | Motivo: ${motivoInput.value.trim()}` : '';
+                
                 const { data: catData } = await supabaseClient.from('catalogo').select('id, quantidade').eq('nome', nomeItem).single();
                 if (catData) {
                     const novoEstoque = catData.quantidade + diferenca;
                     promessasBD.push(supabaseClient.from('catalogo').update({ quantidade: novoEstoque }).eq('id', catData.id));
-                    try { promessasBD.push(supabaseClient.from('logs_estoque').insert([{ material: nomeItem, quantidade_movimentada: diferenca, responsavel: usuarioLogado.nome, motivo: 'Estorno: Ruptura no Despacho' }])); } catch(e){}
+                    try { promessasBD.push(supabaseClient.from('logs_estoque').insert([{ material: nomeItem, quantidade_movimentada: diferenca, responsavel: usuarioLogado.nome, motivo: 'Estorno: Ruptura no Despacho', filial_id: fId }])); } catch(e){}
                 }
-                if (qtdEnviada === 0) { novoDetalhes.push(`0x ${nomeItem} (Ruptura Total)`); } else { novoDetalhes.push(`${qtdEnviada}x ${nomeItem} (Pediu ${qtdOriginal})`); }
-            } else { novoDetalhes.push(`${qtdOriginal}x ${nomeItem}`); }
+                
+                if (qtdEnviada === 0) { 
+                    novoDetalhes.push(`0x ${nomeItem} (Ruptura Total${motivoTexto})`); 
+                } else { 
+                    novoDetalhes.push(`${qtdEnviada}x ${nomeItem} (Pediu ${qtdOriginal}${motivoTexto})`); 
+                }
+            } else { 
+                novoDetalhes.push(`${qtdOriginal}x ${nomeItem}`); 
+            }
         }
+        
         let stringFinal = novoDetalhes.join(', ');
         if (houveRuptura) { stringFinal = '[ATENDIMENTO PARCIAL] ' + stringFinal; } else if (pedidoOriginal.detalhes.includes('[CONTÉM ITEM SEM ESTOQUE]')) { stringFinal = '[CONTÉM ITEM SEM ESTOQUE] ' + stringFinal; }
 
@@ -1089,15 +1387,68 @@ async function confirmarDespacho() {
     } catch (e) { mostrarAviso('Erro ao registrar conferência.', 'erro'); console.error(e); } finally { setCarregamento('btn-confirma-despacho', false); }
 }
 
-function abrirModalRecebimento(id) { document.getElementById('id-pedido-recebimento').value = id; document.getElementById('input-foto-recebimento').value = ''; document.getElementById('nome-arquivo-recebimento').innerText = 'Tirar foto dos produtos'; document.getElementById('modal-recebimento').style.display = 'flex'; }
+function previewFotoRecebimento(input) {
+    const container = document.getElementById('preview-container-recebimento');
+    const img = document.getElementById('img-preview-recebimento');
+    const label = document.getElementById('label-upload-recebimento');
+    
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            img.src = e.target.result;
+            container.style.display = 'block';
+            label.style.display = 'none';
+            lucide.createIcons();
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function removerFotoRecebimento() {
+    document.getElementById('input-foto-recebimento').value = '';
+    document.getElementById('preview-container-recebimento').style.display = 'none';
+    document.getElementById('img-preview-recebimento').src = '';
+    document.getElementById('label-upload-recebimento').style.display = 'flex';
+}
+
+function fecharModalRecebimento() {
+    removerFotoRecebimento();
+    document.getElementById('modal-recebimento').style.display = 'none';
+}
+
+function abrirModalRecebimento(id) { 
+    document.getElementById('id-pedido-recebimento').value = id; 
+    removerFotoRecebimento(); 
+    document.getElementById('modal-recebimento').style.display = 'flex'; 
+}
+
 async function salvarRecebimento() {
-    const id = document.getElementById('id-pedido-recebimento').value; const f = document.getElementById('input-foto-recebimento');
+    const id = document.getElementById('id-pedido-recebimento').value; 
+    const f = document.getElementById('input-foto-recebimento');
+    
     if (f.files.length === 0) return mostrarAviso('A foto é obrigatória!', 'erro');
+    
     setCarregamento('btn-confirma-recebimento', true, 'Confirmando...');
     try { 
-        let url = null; try { url = await fazerUploadDrive(f.files[0], 'entrega'); } catch (errDrive) { mostrarAviso('Erro no upload da foto. Confirmando entrega sem imagem.', 'erro'); }
-        await supabaseClient.from('pedidos').update({ status: 'Entregue', foto_recebimento_url: url }).eq('id', id); mostrarAviso('Confirmada!', 'sucesso'); document.getElementById('modal-recebimento').style.display = 'none'; carregarPedidos(true); 
-    } catch (e) { mostrarAviso('Erro no recebimento.', 'erro'); } finally { setCarregamento('btn-confirma-recebimento', false); }
+        let url = null; 
+        try { 
+            url = await fazerUploadDrive(f.files[0], 'entrega'); 
+        } catch (errDrive) { 
+            throw new Error('Falha no envio da foto. Verifique a internet e tente novamente.'); 
+        }
+        
+        if (!url) throw new Error('Link da imagem não foi gerado.');
+
+        await supabaseClient.from('pedidos').update({ status: 'Entregue', foto_recebimento_url: url }).eq('id', id); 
+        
+        mostrarAviso('Entrega Confirmada!', 'sucesso'); 
+        fecharModalRecebimento(); 
+        carregarPedidos(true); 
+    } catch (e) { 
+        mostrarAviso(e.message || 'Erro no recebimento.', 'erro'); 
+    } finally { 
+        setCarregamento('btn-confirma-recebimento', false); 
+    }
 }
 
 function abrirModalReprovar(id) { document.getElementById('id-pedido-reprovar').value = id; document.getElementById('modal-reprovar').style.display = 'flex'; }
@@ -1167,12 +1518,13 @@ async function confirmarReversaLogistica() {
     setCarregamento('btn-finalizar-reversa', true, 'Estornando...');
     try {
         const revData = JSON.parse(pedido.detalhes.split('||_REV_')[1]); const promessasBD = [];
+        const fId = usuarioLogado.filial_id || null; // SAAS
         for (let item of revData.itens) {
             const { data: catData } = await supabaseClient.from('catalogo').select('id, quantidade').eq('nome', item.nome).single();
             if (catData) {
                 const novoEstoque = catData.quantidade + item.qtd;
                 promessasBD.push(supabaseClient.from('catalogo').update({ quantidade: novoEstoque }).eq('id', catData.id));
-                try { promessasBD.push(supabaseClient.from('logs_estoque').insert([{ material: item.nome, quantidade_movimentada: item.qtd, responsavel: usuarioLogado.nome, motivo: `Logística Reversa: ${item.motivo}` }])); } catch(e){}
+                try { promessasBD.push(supabaseClient.from('logs_estoque').insert([{ material: item.nome, quantidade_movimentada: item.qtd, responsavel: usuarioLogado.nome, motivo: `Logística Reversa: ${item.motivo}`, filial_id: fId }])); } catch(e){}
             }
         }
         promessasBD.push(supabaseClient.from('pedidos').update({ status: 'Reversa Concluída' }).eq('id', id)); await Promise.allSettled(promessasBD);
@@ -1190,7 +1542,9 @@ async function carregarAuditoria() {
     container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--cor-secundaria);"><i data-lucide="loader" class="spinner" style="width:32px; height:32px;"></i></div>'; lucide.createIcons();
     
     try {
-        const { data, error } = await supabaseClient.from('logs_estoque').select('*').order('created_at', { ascending: false }).limit(200);
+        let q = supabaseClient.from('logs_estoque').select('*').order('created_at', { ascending: false }).limit(200);
+        if (usuarioLogado.filial_id) q = q.eq('filial_id', usuarioLogado.filial_id);
+        const { data, error } = await q;
         if (error) throw error;
         memoriaAuditoria = data || [];
         renderizarAuditoria();
@@ -1254,17 +1608,32 @@ async function carregarRelatorios() {
     if(!ctxLojas || !ctxStatus || !ctxMateriais) return;
 
     try {
-        const { data: pedidos } = await supabaseClient.from('pedidos').select('status, detalhes, lojas(nome)');
-        const { count: countLojas } = await supabaseClient.from('lojas').select('*', { count: 'exact', head: true });
+        let qP = supabaseClient.from('pedidos').select('id, status, detalhes, created_at, lojas(nome, usuarios(nome))');
+        let qL = supabaseClient.from('lojas').select('*, usuarios(nome)'); 
+        
+        if (usuarioLogado.filial_id) {
+            qP = qP.eq('filial_id', usuarioLogado.filial_id);
+            qL = qL.eq('filial_id', usuarioLogado.filial_id);
+        }
+        
+        const { data: pedidos } = await qP;
+        const { data: lojas } = await qL; 
         if(!pedidos) return;
 
-        let rupturas = 0;
-        pedidos.forEach(p => { if(p.detalhes.includes('ESTOQUE') || p.detalhes.includes('PARCIAL')) rupturas++; });
-        document.getElementById('kpi-total-pedidos').innerText = pedidos.length;
-        document.getElementById('kpi-lojas-ativas').innerText = countLojas || 0;
-        document.getElementById('kpi-rupturas').innerText = rupturas;
+        memoriaPedidosBI = pedidos || []; 
+        memoriaLojasBI = lojas || []; 
+        memoriaRupturasBI = [];
+        
+        pedidos.forEach(p => { 
+            if(p.detalhes.includes('ESTOQUE') || p.detalhes.includes('PARCIAL')) {
+                memoriaRupturasBI.push(p); 
+            }
+        });
+        
+        document.getElementById('kpi-total-pedidos').innerText = memoriaPedidosBI.length;
+        document.getElementById('kpi-lojas-ativas').innerText = memoriaLojasBI.length;
+        document.getElementById('kpi-rupturas').innerText = memoriaRupturasBI.length;
 
-        // LÓGICA DE TELA VAZIA (EMPTY STATE)
         const containers = [ctxLojas.parentElement, ctxStatus.parentElement, ctxMateriais.parentElement];
         if (pedidos.length === 0) {
             ctxLojas.style.display = 'none'; ctxStatus.style.display = 'none'; ctxMateriais.style.display = 'none';
@@ -1277,15 +1646,24 @@ async function carregarRelatorios() {
                 }
             });
             lucide.createIcons();
-            return; // Para a função aqui e não tenta desenhar os gráficos
+            return; 
         } else {
             ctxLojas.style.display = 'block'; ctxStatus.style.display = 'block'; ctxMateriais.style.display = 'block';
             containers.forEach(c => { const v = c.querySelector('.grafico-vazio'); if(v) v.remove(); });
         }
 
         const contagemLojas = {};
-        pedidos.forEach(p => { const nome = p.lojas ? p.lojas.nome : 'Loja Excluída'; contagemLojas[nome] = (contagemLojas[nome] || 0) + 1; });
-        const lojasOrdenadas = Object.entries(contagemLojas).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        pedidos.forEach(p => { 
+            const lojaNome = p.lojas ? p.lojas.nome : 'Loja Excluída'; 
+            const supNome = (p.lojas && p.lojas.usuarios) ? p.lojas.usuarios.nome : 'Sem Sup';
+            const chave = lojaNome + '|||' + supNome; 
+            
+            if (!contagemLojas[chave]) {
+                contagemLojas[chave] = { nome: lojaNome, sup: supNome, count: 0 };
+            }
+            contagemLojas[chave].count++;
+        });
+        const lojasOrdenadas = Object.values(contagemLojas).sort((a, b) => b.count - a.count).slice(0, 5);
         
         const contagemStatus = { 'Pendente': 0, 'Enviado': 0, 'Entregue': 0, 'Reprovado': 0, 'Reversa': 0 };
         pedidos.forEach(p => { if(p.status.includes('Reversa')) contagemStatus['Reversa']++; else if(contagemStatus[p.status] !== undefined) contagemStatus[p.status]++; });
@@ -1299,7 +1677,7 @@ async function carregarRelatorios() {
                 const match = itemStr.trim().match(/^(\d+)x\s+(.+)$/);
                 if (match) {
                     let qtd = parseInt(match[1]);
-                    let nome = match[2].replace(/\s+\(Pediu \d+\)|\s+\(Ruptura Total\)/g, '').trim();
+                    let nome = match[2].replace(/\s+\(Pediu \d+\)|\s+\(Ruptura Total.*?\)/g, '').replace(/\| Motivo:.*/g, '').trim();
                     contagemMateriais[nome] = (contagemMateriais[nome] || 0) + qtd;
                 }
             });
@@ -1311,8 +1689,36 @@ async function carregarRelatorios() {
         if(chartLojas) chartLojas.destroy();
         chartLojas = new Chart(ctxLojas, {
             type: 'bar',
-            data: { labels: lojasOrdenadas.map(l => l[0].substring(0, 12) + '...'), datasets: [{ label: 'Pedidos', data: lojasOrdenadas.map(l => l[1]), backgroundColor: 'rgba(0, 229, 176, 0.8)', borderRadius: 6, borderSkipped: false }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)', borderDash: [5, 5] }, border: {display: false} }, x: { grid: { display: false }, border: {display: false} } } }
+            data: { 
+                labels: lojasOrdenadas.map(l => l.nome.length > 20 ? l.nome.substring(0, 20) + '...' : l.nome), 
+                datasets: [{ 
+                    label: 'Pedidos', 
+                    data: lojasOrdenadas.map(l => l.count), 
+                    backgroundColor: 'rgba(0, 229, 176, 0.8)', 
+                    borderRadius: 6, 
+                    borderSkipped: false 
+                }] 
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) { return lojasOrdenadas[context[0].dataIndex].nome; },
+                            label: function(context) {
+                                const lojaInfo = lojasOrdenadas[context.dataIndex];
+                                return [`Pedidos: ${lojaInfo.count}`, `Sup: ${lojaInfo.sup}`]; 
+                            }
+                        }
+                    }
+                }, 
+                scales: { 
+                    y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)', borderDash: [5, 5] }, border: {display: false} }, 
+                    x: { grid: { display: false }, border: {display: false}, ticks: { font: { size: 10 } } } 
+                } 
+            }
         });
 
         if(chartStatus) chartStatus.destroy();
@@ -1330,6 +1736,213 @@ async function carregarRelatorios() {
         });
 
     } catch(e) { console.error("Erro no BI", e); }
+}
+
+// ==========================================
+// CENTRAL DE RELATÓRIOS MENSAIS
+// ==========================================
+
+function abrirModalTotalPedidos() {
+    const selectMes = document.getElementById('select-mes-relatorio');
+    
+    // 1. Vasculha a memória do BI e agrupa todos os meses/anos que tiveram pedidos
+    const mesesMap = new Map();
+    memoriaPedidosBI.forEach(p => {
+        const data = new Date(p.created_at);
+        const mesAno = `${String(data.getMonth() + 1).padStart(2, '0')}/${data.getFullYear()}`;
+        mesesMap.set(mesAno, mesAno);
+    });
+
+    // Se não tiver nenhum pedido no sistema
+    if (mesesMap.size === 0) {
+        selectMes.innerHTML = '<option value="">Nenhuma operação registrada ainda</option>';
+        document.getElementById('resumo-mensal-kpis').innerHTML = '';
+        document.getElementById('modal-detalhes-pedidos').style.display = 'flex';
+        return;
+    }
+
+    // 2. Ordena do mês mais recente pro mais antigo
+    const mesesArray = Array.from(mesesMap.keys()).sort((a, b) => {
+        const partsA = a.split('/'); const partsB = b.split('/');
+        return new Date(partsB[1], partsB[0]-1) - new Date(partsA[1], partsA[0]-1);
+    });
+
+    // 3. Preenche o Dropdown de Mês
+    let htmlOpts = '';
+    mesesArray.forEach(m => htmlOpts += `<option value="${m}">${m}</option>`);
+    selectMes.innerHTML = htmlOpts;
+
+    // 4. Renderiza os caixotes (KPIs) com o primeiro mês da lista
+    renderizarResumoMensal(); 
+    
+    document.getElementById('modal-detalhes-pedidos').style.display = 'flex';
+    lucide.createIcons();
+}
+
+function renderizarResumoMensal() {
+    const mesSelecionado = document.getElementById('select-mes-relatorio').value;
+    if (!mesSelecionado) return;
+
+    // Filtra só os pedidos do mês selecionado
+    const pedidosDoMes = memoriaPedidosBI.filter(p => {
+        const data = new Date(p.created_at);
+        const mesAno = `${String(data.getMonth() + 1).padStart(2, '0')}/${data.getFullYear()}`;
+        return mesAno === mesSelecionado;
+    });
+
+    let totalItens = 0;
+    let lojasAtendidas = new Set();
+
+    // Faz a contagem agregada
+    pedidosDoMes.forEach(p => {
+        if(p.lojas && p.lojas.nome) lojasAtendidas.add(p.lojas.nome);
+        
+        let detalhesLimpos = p.detalhes.split('||_REV_')[0].replace(/\[.*?\]/g, '').trim();
+        if(detalhesLimpos.startsWith(',')) detalhesLimpos = detalhesLimpos.substring(1).trim();
+        
+        detalhesLimpos.split(',').forEach(itemStr => {
+            const match = itemStr.trim().match(/^(\d+)x\s+(.+)$/);
+            if (match) { totalItens += parseInt(match[1]); }
+        });
+    });
+
+    // Atualiza o visual da tela
+    document.getElementById('resumo-mensal-kpis').innerHTML = `
+        <div style="background: rgba(0, 229, 176, 0.1); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid rgba(0,229,176,0.3);">
+            <h2 style="margin: 0; color: #00e5b0; font-size: 28px;">${pedidosDoMes.length}</h2>
+            <p style="margin: 5px 0 0 0; font-size: 11px; color: var(--cor-secundaria); text-transform: uppercase;">Pedidos</p>
+        </div>
+        <div style="background: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid rgba(59,130,246,0.3);">
+            <h2 style="margin: 0; color: #3b82f6; font-size: 28px;">${lojasAtendidas.size}</h2>
+            <p style="margin: 5px 0 0 0; font-size: 11px; color: var(--cor-secundaria); text-transform: uppercase;">Lojas</p>
+        </div>
+        <div style="background: rgba(168, 85, 247, 0.1); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid rgba(168,85,247,0.3);">
+            <h2 style="margin: 0; color: #a855f7; font-size: 28px;">${totalItens}</h2>
+            <p style="margin: 5px 0 0 0; font-size: 11px; color: var(--cor-secundaria); text-transform: uppercase;">Itens Saíram</p>
+        </div>
+    `;
+}
+
+function baixarRelatorioMensalExcel() {
+    const mesSelecionado = document.getElementById('select-mes-relatorio').value;
+    if (!mesSelecionado) return mostrarAviso('Nenhum mês selecionado', 'erro');
+
+    const pedidosDoMes = memoriaPedidosBI.filter(p => {
+        const data = new Date(p.created_at);
+        const mesAno = `${String(data.getMonth() + 1).padStart(2, '0')}/${data.getFullYear()}`;
+        return mesAno === mesSelecionado;
+    });
+
+    if(pedidosDoMes.length === 0) return mostrarAviso('Sem dados neste mês.', 'erro');
+
+    mostrarAviso('Gerando Relatório Mensal...', 'sucesso');
+    
+    // Monta a estrutura do Excel limpa
+    const dadosExcel = pedidosDoMes.map(p => {
+        const loja = p.lojas ? p.lojas.nome : 'Loja Excluída';
+        const supervisor = p.lojas && p.lojas.usuarios ? p.lojas.usuarios.nome : 'Sem Supervisor';
+        const dataPedido = new Date(p.created_at).toLocaleDateString('pt-BR');
+        let stringLimpa = p.detalhes.split('||_REV_')[0].replace(/\[.*?\]/g, '').trim();
+        
+        return { 
+            "Num. Pedido": p.id, 
+            "Data Solicitação": dataPedido, 
+            "Status Atual": p.status, 
+            "Destino (Loja)": loja, 
+            "Supervisor": supervisor, 
+            "Materiais Expedidos": stringLimpa 
+        };
+    });
+
+    // Cria e baixa a planilha
+    const worksheet = XLSX.utils.json_to_sheet(dadosExcel); 
+    const workbook = XLSX.utils.book_new(); 
+    XLSX.utils.book_append_sheet(workbook, worksheet, `Resumo ${mesSelecionado.replace('/','-')}`);
+    
+    // Alarga as colunas no Excel para caber o texto
+    worksheet['!cols'] = [{wch: 12}, {wch: 15}, {wch: 15}, {wch: 35}, {wch: 25}, {wch: 90}];
+    
+    XLSX.writeFile(workbook, `Relatorio_Mensal_OPPO_${mesSelecionado.replace('/','_')}.xlsx`);
+}
+
+function abrirModalLojasAtivas() {
+    const container = document.getElementById('lista-lojas-corpo');
+    container.innerHTML = '';
+    
+    if (memoriaLojasBI.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding: 20px;"><i data-lucide="store" style="color: var(--cor-secundaria);"></i><p>Nenhuma loja cadastrada!</p></div>';
+    } else {
+        memoriaLojasBI.forEach(l => {
+            const supNome = l.usuarios ? l.usuarios.nome : 'Sem Supervisor';
+            const cidadeUF = (l.cidade && l.estado) ? `${l.cidade}/${l.estado}` : 'Localização não informada';
+            const promotor = l.promotor_nome ? `<span style="font-size: 11px; color: var(--cor-secundaria); margin-top: 4px; display: block;"><i data-lucide="user" class="lucide-sm" style="display:inline-block; vertical-align:middle; width:12px; margin-right:4px;"></i> Promotor: ${l.promotor_nome}</span>` : '';
+            
+            container.innerHTML += `
+                <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(0, 229, 176, 0.2); border-radius: 8px; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong style="color: #fff; font-size: 15px;">${l.nome}</strong>
+                        <span style="font-size: 12px; color: var(--primary); display: block; margin-top: 4px;">Sup: ${supNome}</span>
+                        ${promotor}
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; font-size: 11px; color: var(--cor-secundaria);"><i data-lucide="map-pin" class="lucide-sm" style="display:inline-block; vertical-align:middle; width:12px; margin-right:4px;"></i> ${cidadeUF}</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    document.getElementById('modal-detalhes-lojas').style.display = 'flex';
+    lucide.createIcons();
+}
+
+function abrirModalRupturas() {
+    const container = document.getElementById('lista-rupturas-corpo');
+    container.innerHTML = '';
+    
+    if (memoriaRupturasBI.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding: 20px;"><i data-lucide="check-circle" style="color: #10b981;"></i><p>Nenhuma ruptura registrada no momento!</p></div>';
+    } else {
+        memoriaRupturasBI.forEach(p => {
+            const lojaNome = p.lojas ? p.lojas.nome : 'Loja Desconhecida';
+            const dataF = new Date(p.created_at || new Date()).toLocaleDateString('pt-BR');
+            
+            let itensRupturaHtml = '';
+            let detalhesLimpos = p.detalhes.split('||_REV_')[0].replace('[CONTÉM ITEM SEM ESTOQUE]', '').replace('[ATENDIMENTO PARCIAL]', '').trim();
+            if(detalhesLimpos.startsWith(',')) detalhesLimpos = detalhesLimpos.substring(1).trim();
+            
+            detalhesLimpos.split(',').forEach(itemStr => {
+                let isFalta = false;
+                
+                if (p.detalhes.includes('ESTOQUE')) {
+                    isFalta = true;
+                } else if (p.detalhes.includes('PARCIAL')) {
+                    if (itemStr.includes('(Pediu') || itemStr.includes('(Ruptura Total)')) {
+                        isFalta = true;
+                    }
+                }
+                
+                if(isFalta) {
+                    itensRupturaHtml += `<li style="font-size: 13px; color: #ff4d4d; margin-bottom: 6px; padding-left: 10px; border-left: 2px solid #ff4d4d; background: rgba(255, 77, 77, 0.05); padding: 8px; border-radius: 4px;">${itemStr.trim()}</li>`;
+                }
+            });
+
+            container.innerHTML += `
+                <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255, 77, 77, 0.2); border-radius: 8px; padding: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 8px;">
+                        <strong style="color: #fff; font-size: 15px;">Pedido #${p.id} - ${lojaNome}</strong>
+                        <span style="font-size: 11px; color: var(--cor-secundaria);">${dataF}</span>
+                    </div>
+                    <ul style="list-style: none; padding: 0; margin: 0;">
+                        ${itensRupturaHtml}
+                    </ul>
+                </div>
+            `;
+        });
+    }
+    
+    document.getElementById('modal-detalhes-rupturas').style.display = 'flex';
+    lucide.createIcons();
 }
 
 // ==========================================

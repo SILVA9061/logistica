@@ -14,7 +14,6 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.1/dist/browser-image-compression.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- Adicionando Biblioteca de Gráficos (Chart.js) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="dark-mode">
@@ -61,6 +60,10 @@
                     <i id="icone-senha-cad" data-lucide="eye" class="lucide-sm"></i>
                 </button>
             </div>
+
+            <select id="cad-filial" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px; margin-bottom: 15px;">
+                <option value="">Carregando empresas...</option>
+            </select>
 
             <button id="btn-cadastrar" onclick="fazerCadastro()" class="btn-neon">Finalizar Cadastro</button>
             <div style="margin-top: 20px; text-align: center; font-size: 13px; color: var(--cor-secundaria);">
@@ -176,17 +179,13 @@
 
             <div class="card-padrao" style="margin-bottom: 25px;">
                 <label style="font-size: 14px; color: var(--primary);">1. Selecione o Destino (Loja / Unidade) *</label>
-                
-                <!-- NOVO SELECT DE LOJA CUSTOMIZADO -->
                 <input type="hidden" id="select-loja" value="">
                 <div class="custom-select-wrapper" style="width: 100%; margin-top: 10px;">
                     <div class="custom-select-trigger input-neon" style="margin-bottom: 0; font-size: 15px; padding: 16px; display: flex; justify-content: space-between; align-items: center;">
                         <span id="loja-selecionada-texto" style="color: var(--cor-secundaria);">Selecione a unidade...</span>
                         <i data-lucide="chevron-down"></i>
                     </div>
-                    <div class="custom-options" id="custom-options-loja" style="width: 100%; max-height: 300px; overflow-y: auto;">
-                        <!-- Carregado via JS -->
-                    </div>
+                    <div class="custom-options" id="custom-options-loja" style="width: 100%; max-height: 300px; overflow-y: auto;"></div>
                 </div>
             </div>
 
@@ -274,7 +273,6 @@
                 </div>
             </div>
             
-            <!-- Barra de Pesquisa e Filtros -->
             <div class="card-padrao" style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; background: rgba(0,0,0,0.3);">
                 <div style="flex: 1; min-width: 250px;">
                     <label style="color: var(--cor-secundaria); font-size: 12px; margin-bottom: 5px; display: block; margin-top: 0;">Buscar Material ou Responsável</label>
@@ -291,9 +289,7 @@
             </div>
             
             <div class="card-padrao" style="background: transparent; border: none; padding: 0;">
-                <div id="lista-auditoria-corpo" style="display: flex; flex-direction: column; gap: 12px; max-height: 65vh; overflow-y: auto; padding-right: 5px;">
-                    <!-- Itens injetados via JS -->
-                </div>
+                <div id="lista-auditoria-corpo" style="display: flex; flex-direction: column; gap: 12px; max-height: 65vh; overflow-y: auto; padding-right: 5px;"></div>
             </div>
         </div>
 
@@ -303,9 +299,9 @@
                 <h2>Análise da Operação (BI)</h2>
             </div>
             
-            <!-- Dashboard KPIs -->
             <div class="bi-kpi-grid" id="bi-kpi-container">
-                <div class="bi-kpi-card" style="background: var(--primary-gradiente); color: #002b22;">
+                <!-- CARD TOTAL DE PEDIDOS - AGORA CLICÁVEL -->
+                <div class="bi-kpi-card" style="background: var(--primary-gradiente); color: #002b22; cursor: pointer;" onclick="abrirModalTotalPedidos()">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                         <div>
                             <h4 style="color:#002b22; font-weight:800;">Total de Solicitações</h4>
@@ -314,7 +310,8 @@
                         <i data-lucide="package" style="width:36px; height:36px; opacity:0.3;"></i>
                     </div>
                 </div>
-                <div class="bi-kpi-card" style="background: rgba(0, 229, 176, 0.1); border: 1px solid var(--primary); color: #fff;">
+                <!-- CARD LOJAS ATIVAS - AGORA CLICÁVEL -->
+                <div class="bi-kpi-card" style="background: rgba(0, 229, 176, 0.1); border: 1px solid var(--primary); color: #fff; cursor: pointer;" onclick="abrirModalLojasAtivas()">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                         <div>
                             <h4 style="color: var(--primary); font-weight:800;">Lojas Ativas</h4>
@@ -323,7 +320,8 @@
                         <i data-lucide="store" style="width:36px; height:36px; color:var(--primary); opacity:0.3;"></i>
                     </div>
                 </div>
-                <div class="bi-kpi-card" style="background: rgba(255, 77, 77, 0.1); border: 1px solid rgba(255, 77, 77, 0.4); color: #fff;">
+                <!-- CARD RUPTURAS - CLICÁVEL -->
+                <div class="bi-kpi-card" style="background: rgba(255, 77, 77, 0.1); border: 1px solid rgba(255, 77, 77, 0.4); color: #fff; cursor: pointer;" onclick="abrirModalRupturas()">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                         <div>
                             <h4 style="color: #ff4d4d; font-weight:800;">Alertas de Ruptura</h4>
@@ -334,7 +332,6 @@
                 </div>
             </div>
 
-            <!-- Gráficos -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
                 <div class="card-padrao chart-container">
                     <h3 style="margin-top: 0; color: #fff; font-size: 15px;">Volume por Loja (Top 5)</h3>
@@ -350,7 +347,6 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     <!-- ================= LIGHTBOX VISUALIZADOR DE IMAGENS ================= -->
@@ -363,19 +359,14 @@
     </div>
 
     <!-- ================= MODAIS GLOBAIS DE AÇÃO ================= -->
-    
-    <!-- Central de Notificações Lateral -->
     <div id="modal-notificacoes" class="notification-drawer">
         <div class="drawer-header">
             <h3><i data-lucide="bell" class="lucide-sm" style="color:var(--primary);"></i> Central de Notificações</h3>
             <button onclick="fecharDrawerNotificacoes()" title="Fechar"><i data-lucide="x"></i></button>
         </div>
-        <div id="lista-notificacoes-corpo" class="drawer-body">
-            <!-- Notificações entram aqui -->
-        </div>
+        <div id="lista-notificacoes-corpo" class="drawer-body"></div>
     </div>
 
-    <!-- Fundo invisível para fechar clicando fora -->
     <div id="overlay-drawer-invisivel" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99998;" onclick="fecharDrawerNotificacoes()"></div>
 
     <div id="modal-confirmacao" class="modal-overlay" style="display: none; z-index: 100000;">
@@ -409,7 +400,7 @@
         <div style="border: 2px solid #000; padding: 20px; width: 100%; height: 100%; font-family: Arial, sans-serif;">
             <div style="border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 15px;">
                 <h1 style="margin: 0 0 5px 0; font-size: 24px;">REMETENTE</h1>
-                <p style="margin: 0; font-size: 16px; font-weight: bold;">Logística OPPO c/o Climbers</p>
+                <p id="etiqueta-nome-empresa" style="margin: 0; font-size: 16px; font-weight: bold;">Logística OPPO c/o Climbers</p>
                 <p style="margin: 5px 0 0 0; font-size: 14px;">Centro de Distribuição Principal</p>
             </div>
             <div>
@@ -511,6 +502,7 @@
         </div>
     </div>
     
+    <!-- MODAIS DE LOJAS COM CPF -->
     <div id="modal-nova-loja" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 600px;">
             <h3>Cadastrar Loja</h3>
@@ -520,6 +512,7 @@
                     <div id="container-supervisor-loja"><label>Supervisor *</label><select id="loja-supervisor" class="input-neon" style="width: 100%;"><option value="">Carregando...</option></select></div>
                     <label>Promotor</label><input type="text" id="loja-promotor" class="input-neon">
                     <label>Contato</label><input type="text" id="loja-contato" class="input-neon">
+                    <label>CPF do Responsável</label><input type="text" id="loja-cpf" class="input-neon" placeholder="Apenas números">
                 </div>
                 <div>
                     <label>CEP</label><input type="text" id="loja-cep" class="input-neon">
@@ -545,6 +538,7 @@
                     <div id="container-edit-supervisor-loja"><label>Mudar Supervisor *</label><select id="edit-loja-supervisor" class="input-neon" style="width: 100%;"></select></div>
                     <label>Promotor</label><input type="text" id="edit-loja-promotor" class="input-neon">
                     <label>Contato</label><input type="text" id="edit-loja-contato" class="input-neon">
+                    <label>CPF do Responsável</label><input type="text" id="edit-loja-cpf" class="input-neon" placeholder="Apenas números">
                 </div>
                 <div>
                     <label>CEP</label><input type="text" id="edit-loja-cep" class="input-neon">
@@ -557,6 +551,7 @@
         </div>
     </div>
 
+    <!-- MODAIS DE USUÁRIO COM FILIAIS DINÂMICAS -->
     <div id="modal-novo-usuario" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <h3>Cadastrar Colaborador</h3>
@@ -571,7 +566,16 @@
                 </button>
             </div>
             
-            <label>Cargo *</label><select id="select-cargo-user" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px;"></select>
+            <label>Cargo *</label>
+            <select id="select-cargo-user" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px;"></select>
+            
+            <label>Empresa / Filial</label>
+            <select id="select-filial-user" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px;">
+                <option value="">Carregando empresas...</option>
+            </select>
+            <input type="text" id="input-nova-filial" class="input-neon" placeholder="Nome da Nova Empresa" style="display: none; width: 100%; margin-bottom: 5px; border-color: var(--primary);">
+            <button type="button" id="btn-toggle-filial" onclick="toggleNovaFilial('new')" style="background: transparent; color: var(--primary); border: none; padding: 0; cursor: pointer; font-size: 12px; font-weight: bold; margin-top: 5px; margin-bottom: 15px;">+ Cadastrar Nova Empresa</button>
+            
             <div class="botoes-acao"><button class="btn-acao btn-limpar" onclick="document.getElementById('modal-novo-usuario').style.display = 'none'">Cancelar</button><button id="btn-salvar-usuario" class="btn-acao btn-enviar" onclick="salvarUsuario()">Cadastrar</button></div>
         </div>
     </div>
@@ -591,7 +595,16 @@
                 </button>
             </div>
             
-            <label>Cargo</label><select id="edit-cargo-user" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px;"></select>
+            <label>Cargo</label>
+            <select id="edit-cargo-user" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px;"></select>
+            
+            <label>Empresa / Filial (Vínculo atual)</label>
+            <select id="edit-filial-user" class="input-neon" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 8px;">
+                <option value="">Carregando empresas...</option>
+            </select>
+            <input type="text" id="edit-nova-filial" class="input-neon" placeholder="Nome da Nova Empresa" style="display: none; width: 100%; margin-bottom: 5px; border-color: var(--primary);">
+            <button type="button" id="btn-toggle-edit-filial" onclick="toggleNovaFilial('edit')" style="background: transparent; color: var(--primary); border: none; padding: 0; cursor: pointer; font-size: 12px; font-weight: bold; margin-top: 5px; margin-bottom: 15px;">+ Cadastrar Nova Empresa</button>
+            
             <div class="botoes-acao"><button class="btn-acao btn-limpar" onclick="document.getElementById('modal-editar-usuario').style.display = 'none'">Cancelar</button><button id="btn-salvar-edicao-usuario" class="btn-acao btn-enviar" onclick="salvarEdicaoUsuario()">Salvar</button></div>
         </div>
     </div>
@@ -613,9 +626,21 @@
         <div class="modal-content">
             <h3>Confirmar Entrega</h3>
             <input type="hidden" id="id-pedido-recebimento">
-            <label for="input-foto-recebimento" class="file-upload-custom"><i data-lucide="camera"></i><span id="nome-arquivo-recebimento">Tirar foto dos produtos</span></label>
-            <input type="file" id="input-foto-recebimento" accept="image/*" capture="environment" style="display: none;" onchange="atualizarNomeArquivo(this, 'nome-arquivo-recebimento')">
-            <div class="botoes-acao"><button class="btn-acao btn-limpar" onclick="document.getElementById('modal-recebimento').style.display = 'none'">Cancelar</button><button id="btn-confirma-recebimento" class="btn-acao btn-enviar" onclick="salvarRecebimento()">Registrar Entrega</button></div>
+            
+            <label for="input-foto-recebimento" class="file-upload-custom" id="label-upload-recebimento">
+                <i data-lucide="camera"></i><span id="nome-arquivo-recebimento">Tirar foto ou escolher da galeria</span>
+            </label>
+            <input type="file" id="input-foto-recebimento" accept="image/*" style="display: none;" onchange="previewFotoRecebimento(this)">
+            
+            <div id="preview-container-recebimento" style="display: none; position: relative; margin-top: 15px; text-align: center;">
+                <img id="img-preview-recebimento" src="" style="max-width: 100%; max-height: 200px; border-radius: 8px; border: 2px solid var(--primary);">
+                <button type="button" class="btn-remover-foto" onclick="removerFotoRecebimento()" style="top: -10px; right: -10px; position: absolute;"><i data-lucide="x" class="lucide-sm"></i></button>
+            </div>
+
+            <div class="botoes-acao">
+                <button class="btn-acao btn-limpar" onclick="fecharModalRecebimento()">Cancelar</button>
+                <button id="btn-confirma-recebimento" class="btn-acao btn-enviar" onclick="salvarRecebimento()">Registrar Entrega</button>
+            </div>
         </div>
     </div>
 
@@ -635,7 +660,6 @@
             
             <div id="lista-reversa-req" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
             
-            <!-- NOVO SELECT DE MOTIVO CUSTOMIZADO -->
             <label>Motivo da Devolução *</label>
             <input type="hidden" id="motivo-reversa" value="Material com Defeito">
             <div class="custom-select-wrapper" style="width: 100%; margin-bottom: 15px;">
@@ -676,6 +700,60 @@
             <div class="botoes-acao">
                 <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-confirmar-reversa').style.display = 'none'">Voltar</button>
                 <button id="btn-finalizar-reversa" class="btn-acao btn-enviar" style="background: #10b981; color: #fff;" onclick="confirmarReversaLogistica()">Receber e Estornar Estoque</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAIS DE ANÁLISE DO DASHBOARD (BI) -->
+    <div id="modal-detalhes-rupturas" class="modal-overlay" style="display: none; z-index: 100000;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #ff4d4d;"><i data-lucide="alert-circle" style="margin-right: 8px;"></i> Detalhamento de Rupturas</h3>
+                <button onclick="document.getElementById('modal-detalhes-rupturas').style.display='none'" style="background: transparent; border: none; color: var(--cor-secundaria); cursor: pointer;"><i data-lucide="x"></i></button>
+            </div>
+            <p style="color: var(--cor-secundaria); font-size: 13px; margin-bottom: 15px;">Abaixo estão os pedidos que sofreram falta de estoque na origem ou foram atendidos parcialmente no despacho.</p>
+            <div id="lista-rupturas-corpo" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 5px;"></div>
+            <div class="botoes-acao" style="margin-top: 20px;">
+                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-detalhes-rupturas').style.display='none'">Fechar Visão</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOVO MODAL DE RELATÓRIOS MENSAIS (AGREGADO) -->
+    <div id="modal-detalhes-pedidos" class="modal-overlay" style="display: none; z-index: 100000;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #00e5b0;"><i data-lucide="calendar-days" style="margin-right: 8px;"></i> Relatórios Mensais</h3>
+                <button onclick="document.getElementById('modal-detalhes-pedidos').style.display='none'" style="background: transparent; border: none; color: var(--cor-secundaria); cursor: pointer;"><i data-lucide="x"></i></button>
+            </div>
+            
+            <p style="color: var(--cor-secundaria); font-size: 13px; margin-bottom: 15px;">Selecione o período para visualizar o consolidado da operação e exportar a planilha.</p>
+
+            <select id="select-mes-relatorio" class="input-neon" style="width: 100%; margin-bottom: 20px; font-weight: bold; font-size: 15px;" onchange="renderizarResumoMensal()">
+                <!-- Preenchido automaticamente via JS -->
+            </select>
+
+            <!-- KPIs Agregados do Mês -->
+            <div id="resumo-mensal-kpis" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                <!-- Preenchido via JS -->
+            </div>
+
+            <div class="botoes-acao" style="margin-top: 20px;">
+                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-detalhes-pedidos').style.display='none'">Fechar</button>
+                <button class="btn-acao btn-enviar" onclick="baixarRelatorioMensalExcel()"><i data-lucide="download" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:4px;"></i> Baixar Excel do Mês</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-detalhes-lojas" class="modal-overlay" style="display: none; z-index: 100000;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #00e5b0;"><i data-lucide="store" style="margin-right: 8px;"></i> Lojas Ativas na Operação</h3>
+                <button onclick="document.getElementById('modal-detalhes-lojas').style.display='none'" style="background: transparent; border: none; color: var(--cor-secundaria); cursor: pointer;"><i data-lucide="x"></i></button>
+            </div>
+            <div id="lista-lojas-corpo" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 5px;"></div>
+            <div class="botoes-acao" style="margin-top: 20px;">
+                <button class="btn-acao btn-limpar" onclick="document.getElementById('modal-detalhes-lojas').style.display='none'">Fechar Visão</button>
             </div>
         </div>
     </div>
